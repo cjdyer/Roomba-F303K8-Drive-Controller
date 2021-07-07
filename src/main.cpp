@@ -64,8 +64,8 @@ void setup(){
     pinMode(pin, OUTPUT);
     pinMode(5, INPUT_PULLDOWN);
     pinMode(6, INPUT_PULLDOWN);
-
     noInterrupts();
+    
         Timer1->setOverflow(2, HERTZ_FORMAT); // 10 Hz
         Timer1->attachInterrupt(ledFlash_callback);
 
