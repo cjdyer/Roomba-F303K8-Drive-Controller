@@ -1,12 +1,12 @@
 #include <Arduino.h>
 #include <SparkFun_TB6612.h>
-#include <ICM_20948.h>
+#include <ICM_20948.h> // Sparkfun ICM_20948 IMU module
 
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
   #error "Due to API change, this sketch is compatible with STM32_CORE_VERSION  >= 0x01090000"
 #endif
 
-/* MOTOR DEFINITIONS */
+/* Define Motor Driver Pins */
 #define AIN1 A5
 #define BIN1 7
 #define AIN2 4
@@ -104,14 +104,6 @@ void loop(){
   const int desiredDistance = 10*fullRev;
 
   if(running == 1){
-    /*if(Lfired || Rfired){
-      Serial.print(encoderPosL);
-      Serial.print("\t");
-      Serial.println(encoderPosR);
-      Lfired = 0;
-      Rfired = 0;
-    }*/
-
     if(encoderPosR >= desiredDistance){
       if(Rrun){
         Serial.print("Right: ");
