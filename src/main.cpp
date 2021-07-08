@@ -36,7 +36,6 @@
 // Configure SPI for IMU
 ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
 
-
 volatile long encoderPosL = 0;
 volatile long encoderPosR = 0;
 float lastKnownPosL = 0;
