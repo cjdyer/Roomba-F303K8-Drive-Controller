@@ -24,6 +24,19 @@
 /* Strip lines per inch */
 #define stripLPI 150.0
 
+/* IMU definitions */
+#define SPI_PORT SPI  // Your desired SPI port.       Used only when "USE_SPI" is defined
+#define CS_PIN 10     // Which pin you connect CS to. Used only when "USE_SPI" is defined
+
+#define WIRE_PORT Wire // Your desired Wire port.      Used when "USE_SPI" is not defined
+#define AD0_VAL 1      // The value of the last bit of the I2C address.                
+                       // On the SparkFun 9DoF IMU breakout the default is 1, and when 
+                       // the ADR jumper is closed the value becomes 0
+
+// Configure SPI for IMU
+ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
+
+
 volatile long encoderPosL = 0;
 volatile long encoderPosR = 0;
 float lastKnownPosL = 0;
@@ -76,8 +89,68 @@ void encoderRight_callback(){
   }
 }
 
+void printFormattedFloat(float val, uint8_t leading, uint8_t decimals){
+  float aval = abs(val);
+  if (val < 0){
+    Serial.print("-");
+
+  } else {
+    Serial.print(" ");
+  }
+
+  for (uint8_t indi = 0; indi < leading; indi++){
+    uint32_t tenpow = 0;
+    if (indi < (leading - 1)){
+      tenpow = 1;
+    }
+    
+    for (uint8_t c = 0; c < (leading - 1 - indi); c++){
+      tenpow *= 10;
+    }
+
+    if (aval < tenpow){
+      Serial.print("0");
+
+    } else {
+      break;
+    }
+  }
+  if (val < 0){
+    Serial.print(-val, decimals);
+
+  } else {
+    Serial.print(val, decimals);
+  }
+}
+
+void printScaledAGMT(ICM_20948_SPI *sensor){
+  Serial.print("Scaled. Acc (mg) [ ");
+  printFormattedFloat(sensor->accX(), 5, 2);
+  Serial.print(", ");
+  printFormattedFloat(sensor->accY(), 5, 2);
+  Serial.print(", ");
+  printFormattedFloat(sensor->accZ(), 5, 2);
+  Serial.print(" ], Gyr (DPS) [ ");
+  printFormattedFloat(sensor->gyrX(), 5, 2);
+  Serial.print(", ");
+  printFormattedFloat(sensor->gyrY(), 5, 2);
+  Serial.print(", ");
+  printFormattedFloat(sensor->gyrZ(), 5, 2);
+  Serial.print(" ], Mag (uT) [ ");
+  printFormattedFloat(sensor->magX(), 5, 2);
+  Serial.print(", ");
+  printFormattedFloat(sensor->magY(), 5, 2);
+  Serial.print(", ");
+  printFormattedFloat(sensor->magZ(), 5, 2);
+  Serial.print(" ], Tmp (C) [ ");
+  printFormattedFloat(sensor->temp(), 5, 2);
+  Serial.print(" ]");
+  Serial.println();
+}
+
 void setup(){
   Serial.begin(115200);
+  while (!Serial){};
 
   // Configure Encoder Pins
   pinMode (encoderLA, INPUT);
@@ -92,22 +165,54 @@ void setup(){
   attachInterrupt(encoderLB, encoderLeft_callback, CHANGE);
   attachInterrupt(encoderRA, encoderRight_callback, CHANGE);
   attachInterrupt(encoderRB, encoderRight_callback, CHANGE);
+  Serial.println("Motor Pin Configured");
 
   brake(motorL, motorR);
+  Serial.println("Motor Brakes Applied");
 
   delay(200);
   lastKnownPosL = encoderPosR / stripLPI * 25.4;
   lastKnownPosL = encoderPosR / stripLPI * 25.4;
+
+  // Initialise IMU with SPI
+  myICM.begin(CS_PIN, SPI_PORT);
+
+  bool initialized = false;
+  while (!initialized){
+    Serial.print(F("Initialization of the sensor returned: "));
+    Serial.println(myICM.statusString());
+
+    if(myICM.status != ICM_20948_Stat_Ok){
+      Serial.println("Trying again...");
+      delay(500);
+    } else {
+      initialized = true;
+    }
+  }
+
 }
 
 void loop(){
   const int desiredDistance = 10*fullRev;
 
   if(running == 1){
+
+    if (myICM.dataReady()){
+      myICM.getAGMT();         // The values are only updated when you call 'getAGMT'
+      
+      //printRawAGMT( myICM.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
+      printScaledAGMT(&myICM); // This function takes into account the scale settings from when the measurement was made to calculate the values with units
+      delay(30);
+
+    }else{
+      Serial.println("Waiting for data");
+      delay(500);
+    }
+
     if(encoderPosR >= desiredDistance){
       if(Rrun){
-        Serial.print("Right: ");
-        Serial.println(encoderPosR);
+        //Serial.print("Right: ");
+        //Serial.println(encoderPosR);
         Rrun = 0;
       }
       motorR.brake();
@@ -118,8 +223,8 @@ void loop(){
 
     if(encoderPosL >= desiredDistance){
       if(Lrun){
-        Serial.print("Right: ");
-        Serial.println(encoderPosL);
+        //Serial.print("Right: ");
+        //Serial.println(encoderPosL);
         Lrun = 0;
       }
       
