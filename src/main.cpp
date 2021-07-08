@@ -101,16 +101,18 @@ void setup(){
 }
 
 void loop(){
+  const int desiredDistance = 10*fullRev;
+
   if(running == 1){
-    if(Lfired || Rfired){
+    /*if(Lfired || Rfired){
       Serial.print(encoderPosL);
       Serial.print("\t");
       Serial.println(encoderPosR);
       Lfired = 0;
       Rfired = 0;
-    }
+    }*/
 
-    if(encoderPosR >= fullRev){
+    if(encoderPosR >= desiredDistance){
       if(Rrun){
         Serial.print("Right: ");
         Serial.println(encoderPosR);
@@ -122,7 +124,7 @@ void loop(){
       motorR.drive(200);
     }
 
-    if(encoderPosL >= fullRev){
+    if(encoderPosL >= desiredDistance){
       if(Lrun){
         Serial.print("Right: ");
         Serial.println(encoderPosL);
@@ -134,14 +136,14 @@ void loop(){
       motorL.drive(200);
     }
 
-    if((encoderPosL >= fullRev) && (encoderPosR >= fullRev)){
+    if((encoderPosL >= desiredDistance) && (encoderPosR >= desiredDistance)){
       Serial.print(encoderPosL);
       Serial.print("\t");
       Serial.println(encoderPosR);
       Serial.print("Both motors stopped at distance: Left: ");
-      Serial.print((encoderPosL/fullRev) * wheelCirc);
+      Serial.print((encoderPosL/desiredDistance) * wheelCirc);
       Serial.print("m ");
-      Serial.print((encoderPosR/fullRev) * wheelCirc);
+      Serial.print((encoderPosR/desiredDistance) * wheelCirc);
       Serial.print("m ");
       running = 0;
     }
