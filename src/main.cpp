@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <SparkFun_TB6612.h>
-#include <ICM_20948.h> // ISSUES
+#include <ICM_20948.h>
 
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
   #error "Due to API change, this sketch is compatible with STM32_CORE_VERSION  >= 0x01090000"
@@ -39,13 +39,15 @@ const float fullRev = 1632.67;
 const float wheelCirc = 3.14 * 0.8; // Circumference in metres
 
 // Initialise motor objects
-Motor motorL = Motor(AIN1, AIN2, PWMA, offsetA, STBY);
-Motor motorR = Motor(BIN1, BIN2, PWMB, offsetB, STBY);
+Motor motorL = Motor(BIN1, BIN2, PWMB, offsetB, STBY);
+Motor motorR = Motor(AIN1, AIN2, PWMA, offsetA, STBY);
 
 bool Lfired = 0;
 bool Rfired = 0;
 
 bool running = 1;
+bool Lrun = 1;
+bool Rrun = 1;
 
 // Quadrature Encoder matrix - 2s shouldn't ever appear Sauce: https://cdn.sparkfun.com/datasheets/Robotics/How%20to%20use%20a%20quadrature%20encoder.pdf
 int QEM [16] = {0,-1,1,2,1,0,2,-1,-1,2,0,1,2,1,-1,0}; 
@@ -54,62 +56,28 @@ int ROld = 0; // Previous encoder value right motor
 int LNew = 0; // New encoder value left motor
 int RNew = 0; // New encoder value right motor
 
+// Left Hall encoder. Called once for each sensor on pin-change (quadrature)
 void encoderLeft_callback(){
-  LOld = LNew;
-  LNew = (digitalRead(encoderLA) * 2) + digitalRead(encoderLB); // Convert binary input to decimal value // (PINC & 0b0001) gets the value of bit zero in port C (A0), ((PINC & 0b0010) >> 1) gets just the value of A1
-  encoderPosL = encoderPosL + QEM[LOld * 4 + LNew];
-  Lfired = 1;
+  if(Lrun){
+    LOld = LNew;
+    LNew = digitalRead(encoderLA) * 2 + digitalRead(encoderLB); // Convert binary input to decimal value // (PINC & 0b0001) gets the value of bit zero in port C (A0), ((PINC & 0b0010) >> 1) gets just the value of A1
+    encoderPosL = encoderPosL + QEM[LOld * 4 + LNew];
+    Lfired = 1;
+  }
 }
 
+// Right Hall encoder. Called once for each sensor on pin-change (quadrature)
 void encoderRight_callback(){
-  ROld = RNew;
-  RNew = (digitalRead(encoderRA) * 2) + digitalRead(encoderRA); // Convert binary input to decimal value // (PINC & 0b0001) gets the value of bit zero in port C (A0), ((PINC & 0b0010) >> 1) gets just the value of A1
-  encoderPosR = encoderPosR + QEM[ROld * 4 + RNew];
-  Rfired = 1;
+  if(Rrun){
+    ROld = RNew;
+    RNew = digitalRead(encoderRA) * 2 + digitalRead(encoderRB); // Convert binary input to decimal value // (PINC & 0b0001) gets the value of bit zero in port C (A0), ((PINC & 0b0010) >> 1) gets just the value of A1
+    encoderPosR = encoderPosR + QEM[ROld * 4 + RNew];
+    Rfired = 1;
+  }
 }
-
-/*
-// Define Timer instances
-TIM_TypeDef *Instance1 = TIM1;
-TIM_TypeDef *Instance2 = TIM2;
-
-// Define Timer Objects
-HardwareTimer *Timer1 = new HardwareTimer(Instance1);
-HardwareTimer *Timer2 = new HardwareTimer(Instance2);
-*/
-
-// Callback Functions
-/*
-void ledFlash_callback(void)  {counter1++; digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));} // Toggle pin. 10hz toogle --> 5Hz PWM
-void print_callback(void)     {counter2++;}
-void btn1_callback(void)      {counter3++;}
-void btn2_callback(void)      {counter4++;}
-*/
 
 void setup(){
-    Serial.begin(115200);
-    
-    /*
-    // configure pin in output mode
-    pinMode(LED_BUILTIN, OUTPUT);
-    pinMode(5, INPUT_PULLDOWN);
-    pinMode(6, INPUT_PULLDOWN);
-    noInterrupts();
-
-    Timer1->setOverflow(2, HERTZ_FORMAT); // 10 Hz
-    Timer1->attachInterrupt(ledFlash_callback);
-
-    Timer2->setOverflow(1, HERTZ_FORMAT); // 10 Hz
-    Timer2->attachInterrupt(print_callback);
-
-    attachInterrupt(5, btn1_callback, RISING);
-    attachInterrupt(6, btn2_callback, RISING);
-    interrupts();
-    Timer1->resume();
-    Timer2->resume();
-
-    Serial.println("T1 \t T2 \t D5\t D6");
-    */
+  Serial.begin(115200);
 
   // Configure Encoder Pins
   pinMode (encoderLA, INPUT);
@@ -120,10 +88,10 @@ void setup(){
   digitalWrite(encoderLB, HIGH);
   digitalWrite(encoderRA, HIGH);
   digitalWrite(encoderRB, HIGH);
-  attachInterrupt(encoderLA, encoderLeft_callback, RISING);
-  attachInterrupt(encoderLB, encoderLeft_callback, RISING);
-  attachInterrupt(encoderRA, encoderRight_callback, RISING);
-  attachInterrupt(encoderRB, encoderRight_callback, RISING);
+  attachInterrupt(encoderLA, encoderLeft_callback, CHANGE);
+  attachInterrupt(encoderLB, encoderLeft_callback, CHANGE);
+  attachInterrupt(encoderRA, encoderRight_callback, CHANGE);
+  attachInterrupt(encoderRB, encoderRight_callback, CHANGE);
 
   brake(motorL, motorR);
 
@@ -134,39 +102,50 @@ void setup(){
 
 void loop(){
   if(running == 1){
-    /*Serial.print(counter1);
-    Serial.print("\t");
-    Serial.print(counter2);
-    Serial.print("\t");
-    Serial.print(counter3);
-    Serial.print("\t");
-    Serial.println(counter4);
+    if(Lfired || Rfired){
+      Serial.print(encoderPosL);
+      Serial.print("\t");
+      Serial.println(encoderPosR);
+      Lfired = 0;
+      Rfired = 0;
+    }
 
-    if(counter3 >= 10){Timer1->pause();}
-    if(counter4 >= 10){Timer2->pause();}
-
-    delay(10);*/
-
-    if(encoderPosR > fullRev)
-      motorL.brake();
-    else
-      motorL.drive(100);
-    
-    if(encoderPosL > fullRev)
+    if(encoderPosR >= fullRev){
+      if(Rrun){
+        Serial.print("Right: ");
+        Serial.println(encoderPosR);
+        Rrun = 0;
+      }
       motorR.brake();
-    else
-      motorR.drive(100);
 
-    if((encoderPosL > fullRev) && (encoderPosR > fullRev)){
+    }else{
+      motorR.drive(200);
+    }
+
+    if(encoderPosL >= fullRev){
+      if(Lrun){
+        Serial.print("Right: ");
+        Serial.println(encoderPosL);
+        Lrun = 0;
+      }
+      
+      motorL.brake();
+    }else{
+      motorL.drive(200);
+    }
+
+    if((encoderPosL >= fullRev) && (encoderPosR >= fullRev)){
+      Serial.print(encoderPosL);
+      Serial.print("\t");
+      Serial.println(encoderPosR);
       Serial.print("Both motors stopped at distance: Left: ");
       Serial.print((encoderPosL/fullRev) * wheelCirc);
       Serial.print("m ");
       Serial.print((encoderPosR/fullRev) * wheelCirc);
       Serial.print("m ");
-      motorR.brake();
-      motorL.brake();
       running = 0;
     }
+
   }else{
     brake(motorL, motorR);
   }
