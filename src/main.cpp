@@ -1,6 +1,6 @@
 #include <Arduino.h>
 #include <SparkFun_TB6612.h>
-#include <ICM_20948.h>
+#include <ICM_20948.h> // ISSUES
 
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
   #error "Due to API change, this sketch is compatible with STM32_CORE_VERSION  >= 0x01090000"
