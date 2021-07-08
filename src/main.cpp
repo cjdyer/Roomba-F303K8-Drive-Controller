@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <SparkFun_TB6612.h>
+#include <ICM_20948.h>
 
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
   #error "Due to API change, this sketch is compatible with STM32_CORE_VERSION  >= 0x01090000"
@@ -145,7 +146,7 @@ void loop(){
     if(counter4 >= 10){Timer2->pause();}
 
     delay(10);*/
-    
+
     if(encoderPosR > fullRev)
       motorL.brake();
     else
