@@ -15,7 +15,7 @@
 #define PWMB 6
 #define STBY 9
 
-// Define encoder pins
+/* Define encoder pins */
 #define encoderLA A0 //3
 #define encoderLB A1 //2
 #define encoderRA A2 //3
@@ -210,8 +210,6 @@ void loop(){
 
     if(encoderPosR >= desiredDistance){
       if(Rrun){
-        //Serial.print("Right: ");
-        //Serial.println(encoderPosR);
         Rrun = 0;
       }
       motorR.brake();
@@ -222,8 +220,6 @@ void loop(){
 
     if(encoderPosL >= desiredDistance){
       if(Lrun){
-        //Serial.print("Right: ");
-        //Serial.println(encoderPosL);
         Lrun = 0;
       }
       
