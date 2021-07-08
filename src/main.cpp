@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <SparkFun_TB6612.h>
 #include <ICM_20948.h> // Sparkfun ICM_20948 IMU module
+#include <PID_v1.h>
 
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
   #error "Due to API change, this sketch is compatible with STM32_CORE_VERSION  >= 0x01090000"
@@ -204,25 +205,24 @@ void loop(){
       delay(30);
 
     }else{
+
       Serial.println("Waiting for data");
       delay(500);
     }
 
     if(encoderPosR >= desiredDistance){
-      if(Rrun){
+      if(Rrun)
         Rrun = 0;
-      }
+      
       motorR.brake();
-
     }else{
       motorR.drive(200);
     }
 
     if(encoderPosL >= desiredDistance){
-      if(Lrun){
+      if(Lrun)
         Lrun = 0;
-      }
-      
+            
       motorL.brake();
     }else{
       motorL.drive(200);
