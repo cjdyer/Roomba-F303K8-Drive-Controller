@@ -27,6 +27,7 @@
 #define stripLPI 150.0
 
 /* IMU definitions */
+/*
 #define SPI_PORT SPI  // Your desired SPI port.       Used only when "USE_SPI" is defined
 #define CS_PIN 10     // Which pin you connect CS to. Used only when "USE_SPI" is defined
 
@@ -34,7 +35,7 @@
 #define AD0_VAL 1      // The value of the last bit of the I2C address.                
                        // On the SparkFun 9DoF IMU breakout the default is 1, and when 
                        // the ADR jumper is closed the value becomes 0
-
+*/
 // Configure SPI for IMU
 ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
 
@@ -71,7 +72,8 @@ const int offsetA = 1;
 const int offsetB = 1;
 
 // Ticks per drive-shaft revolution (different per motor/gearbox)
-const float fullRev = 1632.67;
+//const float fullRev = 1632.67;
+const float fullRev = 1632.67/2;
 
 const float wheelCirc = 3.14 * 0.8; // Circumference in metres
 
@@ -97,8 +99,8 @@ int RNew = 0; // New encoder value right motor
 
 unsigned int counter1 = 0;
 
-TIM_TypeDef *Instance1 = TIM1;
-HardwareTimer *Timer1 = new HardwareTimer(Instance1);
+TIM_TypeDef *Instance2 = TIM2;
+HardwareTimer *Timer2 = new HardwareTimer(Instance2);
 
 // PID Configuration parameters
 //Specify the links and initial tuning parameters
@@ -114,6 +116,8 @@ PID pidLeft(&wheelSpeedL, &speedL_pwm, &wheelSpeedL_desired, kp, ki, kd, DIRECT)
 // Speed Calc Callback
 void speedCalc_callback(void){ // Every 100ms
   // Calc Left Motor Speed
+  digitalWrite(LED_BUILTIN, !digitalRead(LED_BUILTIN));
+  //counter1++;
   wheelSpeedL = 600 * (encoderPosL/fullRev)/0.1; // RPM angular_vel = da/dt * 600 (convert to minutes)
   wheelSpeedR = 600 * (encoderPosR/fullRev)/0.1; // RPM
   speedTotalL += wheelSpeedL;
@@ -124,7 +128,6 @@ void speedCalc_callback(void){ // Every 100ms
   speedCheck = 1;
 
   //wheelSpeedL = map(wheelSpeedL, 0, 15, 0, 255);
-
 
 /*
   if(Lrun){
@@ -163,6 +166,22 @@ void speedCalc_callback(void){ // Every 100ms
 }
 
 // Left Hall encoder. Called once for each sensor on pin-change (quadrature)
+void encoderLeft_callbackA(void){
+  if(digitalRead(encoderLB)==LOW) {
+    encoderPosL++;
+  }else{
+    encoderPosL--;
+  }
+  Lfired = 1;
+}
+void encoderLeft_callbackB(void){
+  if(digitalRead(encoderLA)==LOW) {
+    encoderPosL--;
+  }else{
+    encoderPosL++;
+  }
+  Lfired = 1;
+}
 void encoderLeft_callback(void){
   if(Lrun){
     LOld = LNew;
@@ -246,7 +265,7 @@ void printScaledAGMT(ICM_20948_SPI *sensor){
 void setup(){
   Serial.begin(115200);
   while (!Serial){};
-  //pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(LED_BUILTIN, OUTPUT);
   // Configure Encoder Pins
   pinMode (encoderLA, INPUT);
   pinMode (encoderLB, INPUT);
@@ -256,8 +275,8 @@ void setup(){
   digitalWrite(encoderLB, HIGH);
   digitalWrite(encoderRA, HIGH);
   digitalWrite(encoderRB, HIGH);
-  attachInterrupt(encoderLA, encoderLeft_callback, CHANGE);
-  attachInterrupt(encoderLB, encoderLeft_callback, CHANGE);
+  attachInterrupt(encoderLA, encoderLeft_callbackA, RISING);
+  attachInterrupt(encoderLB, encoderLeft_callbackB, RISING);
   attachInterrupt(encoderRA, encoderRight_callback, CHANGE);
   attachInterrupt(encoderRB, encoderRight_callback, CHANGE);
   Serial.println("Motor Pin Configured");
@@ -270,10 +289,10 @@ void setup(){
   lastKnownPosL = encoderPosR / stripLPI * 25.4;
   lastKnownPosR = encoderPosL / stripLPI * 25.4;
 
-  Serial.print("Initializing IMU... ");
+  //Serial.print("Initializing IMU... ");
   // Initialise IMU with SPI
   
-  myICM.begin(CS_PIN, SPI_PORT);
+  /*myICM.begin(CS_PIN, SPI_PORT);
 
   bool initialized = false;
   while (!initialized){
@@ -288,16 +307,17 @@ void setup(){
       Serial.print("Initialized");
     }
   }
-
+*/
   Serial.print("Activating Timer");
   // Configure Speed calculation interrupt with Timer1
   //Timer1->setOverflow(100000, MICROSEC_FORMAT); // 10 Hz // HERTZ_FORMAT
   delay(500);
   noInterrupts();
-      Timer1->setOverflow(100000, MICROSEC_FORMAT);
-      Timer1->attachInterrupt(speedCalc_callback);
+      //Timer1->setOverflow(100000, MICROSEC_FORMAT);
+      Timer2->setOverflow(100, HERTZ_FORMAT);
+      Timer2->attachInterrupt(speedCalc_callback);
   interrupts();
-  Timer1->resume();//*/
+  Timer2->resume();//*/
   start_time = micros();
 }
 
@@ -305,7 +325,6 @@ void loop(){
   const int desiredDistance = fullRev;
   
   if(running == 1){
-
     /*if(Lfired){
       Serial.print(wheelSpeedL);
       Serial.print("\t");
@@ -348,9 +367,9 @@ void loop(){
       wheelSpeedL_desired = 10;
     }//*/
 
-
 //wheelSpeedL = 60 * (encoderPosL/fullRev)/0.01;
 
+    ///*
     Lrun = 1;
     pidLeft.Compute();
     for(int i=0; i <= 250; i++){
@@ -370,7 +389,26 @@ void loop(){
       Serial.print("\t");
       Serial.println(speedL_pwm);
       motorL.drive(i);
-      delay(5);
+      delay(50);
+    }
+    for(int i=0; i <= 250; i++){
+      //wheelSpeedL_desired = map(i, 0, 250, 0, 20);
+      //Serial.print("Left speed set to ");
+      Serial.print(encoderPosL);
+      Serial.print("\t");
+      Serial.print(fullRev);
+      Serial.print("\t");
+      Serial.print((encoderPosL/fullRev));
+      Serial.print("\t");
+      Serial.print(i);
+      Serial.print("\t");
+      Serial.print(wheelSpeedL_desired);
+      Serial.print("\t");
+      Serial.print(wheelSpeedL);
+      Serial.print("\t");
+      Serial.println(speedL_pwm);
+      motorL.drive(255);
+      delay(50);
     }
     for(int i=250; i >= 0; i--){
       //Serial.print("Left speed set to ");
@@ -389,9 +427,10 @@ void loop(){
       Serial.print("\t");
       Serial.println(speedL_pwm);
       motorL.drive(i);
-      delay(5);
-    }
-    running = 0;
+      delay(50);
+    }//*/
+    //running = 0;
+    //Timer1->pause();
     Lrun = 0;
 
     /*if(wheelSpeedDistanceL >= desiredDistance){
@@ -432,5 +471,12 @@ void loop(){
     //}
   }else{
     brake(motorL, motorR);
+    //motorL.drive(100);
+    if(Lfired){
+      Serial.print(wheelSpeedL);
+      Serial.print("\t");
+      Serial.println(encoderPosL);
+      Lfired = 0;
+    }//*/
   }
 }
