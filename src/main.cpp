@@ -102,14 +102,11 @@ HardwareTimer *Timer1 = new HardwareTimer(Instance1);
 
 // PID Configuration parameters
 //Specify the links and initial tuning parameters
-double Kp=2, Ki=5, Kd=1;
+double kp = 2.0, ki = 5.0, kd = 1.0;
 
 unsigned int start_time;
 unsigned int end_time;
 bool speedCheck = 0;
-
-// PID perameters
-double kp = 0.5, ki = 0.5, kd = 0.5;
 
 //PID pidRight(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
 PID pidLeft(&wheelSpeedL, &speedL_pwm, &wheelSpeedL_desired, kp, ki, kd, DIRECT);
@@ -117,8 +114,8 @@ PID pidLeft(&wheelSpeedL, &speedL_pwm, &wheelSpeedL_desired, kp, ki, kd, DIRECT)
 // Speed Calc Callback
 void speedCalc_callback(void){ // Every 100ms
   // Calc Left Motor Speed
-  wheelSpeedL = 600 * (encoderPosL/fullRev)/0.05; // RPM angular_vel = da/dt * 600 (convert to minutes)
-  wheelSpeedR = 600 * (encoderPosR/fullRev)/0.05; // RPM
+  wheelSpeedL = 600 * (encoderPosL/fullRev)/0.1; // RPM angular_vel = da/dt * 600 (convert to minutes)
+  wheelSpeedR = 600 * (encoderPosR/fullRev)/0.1; // RPM
   speedTotalL += wheelSpeedL;
   speedTotalR += wheelSpeedR;
   counter1++;
@@ -126,9 +123,8 @@ void speedCalc_callback(void){ // Every 100ms
   encoderPosR = 0;
   speedCheck = 1;
 
-  wheelSpeedL = map(wheelSpeedL, 0, 15, 0, 255);
+  //wheelSpeedL = map(wheelSpeedL, 0, 15, 0, 255);
 
-  pidLeft.Compute();
 
 /*
   if(Lrun){
@@ -150,6 +146,7 @@ void speedCalc_callback(void){ // Every 100ms
     speedL_pwm = 0;
   }
 */
+/*
   if (speedL_pwm < 255 & speedL_pwm >0){
     motorL.drive(speedL_pwm);
 
@@ -160,14 +157,13 @@ void speedCalc_callback(void){ // Every 100ms
     else{
       motorL.drive(0);
     }
-  }
+  }*/
 
   //Serial.println("tick"); CAN'T USE SERIAL PRINT IN STM32 BOARDS IN INTERRUPTS
 }
 
 // Left Hall encoder. Called once for each sensor on pin-change (quadrature)
 void encoderLeft_callback(void){
-  
   if(Lrun){
     LOld = LNew;
     LNew = digitalRead(encoderLA) * 2 + digitalRead(encoderLB); // Convert binary input to decimal value // (PINC & 0b0001) gets the value of bit zero in port C (A0), ((PINC & 0b0010) >> 1) gets just the value of A1
@@ -298,7 +294,7 @@ void setup(){
   //Timer1->setOverflow(100000, MICROSEC_FORMAT); // 10 Hz // HERTZ_FORMAT
   delay(500);
   noInterrupts();
-      Timer1->setOverflow(50000, MICROSEC_FORMAT);
+      Timer1->setOverflow(100000, MICROSEC_FORMAT);
       Timer1->attachInterrupt(speedCalc_callback);
   interrupts();
   Timer1->resume();//*/
@@ -309,6 +305,13 @@ void loop(){
   const int desiredDistance = fullRev;
   
   if(running == 1){
+
+    /*if(Lfired){
+      Serial.print(wheelSpeedL);
+      Serial.print("\t");
+      Serial.println(encoderPosL);
+      Lfired = 0;
+    }//*/
     //Serial.print(counter1);
     //Serial.print("\t");
     /*if (myICM.dataReady()){
@@ -326,14 +329,14 @@ void loop(){
     //Serial.print("\t");
     //Serial.println(encoderPosL);
     //Serial.print("\t");
-    if(speedCheck){
+    /*if(speedCheck){
       Serial.print(wheelSpeedL);
       Serial.print("\t");
       Serial.print(speedL_pwm);
       Serial.print("\t");
       Serial.println(wheelSpeedR);
       speedCheck = 0;
-    }
+    }*/
 
     /*if(wheelSpeedDistanceR >= desiredDistance){
       if(Rrun){
@@ -345,28 +348,50 @@ void loop(){
       wheelSpeedL_desired = 10;
     }//*/
 
+
+//wheelSpeedL = 60 * (encoderPosL/fullRev)/0.01;
+
     Lrun = 1;
+    pidLeft.Compute();
     for(int i=0; i <= 250; i++){
-      wheelSpeedL_desired = i;
+      wheelSpeedL_desired = map(i, 0, 250, 0, 20);
       //Serial.print("Left speed set to ");
+      Serial.print(encoderPosL);
+      Serial.print("\t");
+      Serial.print(fullRev);
+      Serial.print("\t");
+      Serial.print((encoderPosL/fullRev));
+      Serial.print("\t");
+      Serial.print(i);
+      Serial.print("\t");
+      Serial.print(wheelSpeedL_desired);
+      Serial.print("\t");
       Serial.print(wheelSpeedL);
       Serial.print("\t");
-      Serial.print(speedL_pwm);
-      Serial.print("\t");
-      Serial.println(i);
+      Serial.println(speedL_pwm);
+      motorL.drive(i);
       delay(5);
     }
     for(int i=250; i >= 0; i--){
       //Serial.print("Left speed set to ");
-      wheelSpeedL_desired = i;
+      wheelSpeedL_desired = map(i, 0, 250, 0, 20);
+      Serial.print(encoderPosL);
+      Serial.print("\t");
+      Serial.print(fullRev);
+      Serial.print("\t");
+      Serial.print((encoderPosL/fullRev));
+      Serial.print("\t");
+      Serial.print(i);
+      Serial.print("\t");
+      Serial.print(wheelSpeedL_desired);
+      Serial.print("\t");
       Serial.print(wheelSpeedL);
       Serial.print("\t");
-      Serial.print(speedL_pwm);
-      Serial.print("\t");
-      Serial.println(i);
+      Serial.println(speedL_pwm);
+      motorL.drive(i);
       delay(5);
     }
-
+    running = 0;
     Lrun = 0;
 
     /*if(wheelSpeedDistanceL >= desiredDistance){
@@ -381,7 +406,7 @@ void loop(){
 
     //if((wheelSpeedDistanceL >= desiredDistance) && (wheelSpeedDistanceR >= desiredDistance)){
       //Timer1->pause();
-      Serial.print(wheelSpeedDistanceR);
+      /*Serial.print(wheelSpeedDistanceR);
       Serial.print("\t");
       Serial.println(wheelSpeedDistanceR);
       Serial.print("Both motors stopped at distance: Left: ");
@@ -390,7 +415,7 @@ void loop(){
       Serial.print((wheelSpeedDistanceR/desiredDistance) * wheelCirc);
       Serial.println("m ");
       
-      running = 0;
+      //running = 0;
       end_time = micros();
       Serial.print(end_time);
       Serial.print(" - ");
@@ -402,10 +427,10 @@ void loop(){
       Serial.print("Average Speed (L R): ");
       Serial.print(speedTotalL/counter1);
       Serial.print(" : ");
-      Serial.println(speedTotalR/counter1);
+      Serial.println(speedTotalR/counter1);*/
+      delay(2000);
     //}
   }else{
     brake(motorL, motorR);
-    
   }
 }
