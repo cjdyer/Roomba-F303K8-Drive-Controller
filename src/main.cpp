@@ -3,6 +3,7 @@
 #include <ICM_20948.h> // Sparkfun ICM_20948 IMU module
 #include <PID_v1.h>
 
+// Hardware Timer check
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
   #error "Due to API change, this sketch is compatible with STM32_CORE_VERSION  >= 0x01090000"
 #endif
@@ -39,6 +40,10 @@ ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
 
 volatile long encoderPosL = 0;
 volatile long encoderPosR = 0;
+volatile float wheelSpeedL = 0; // RPM
+volatile float wheelSpeedR = 0; // RPM
+volatile long wheelSpeedDistanceL = 0; // RPM
+volatile long wheelSpeedDistanceR = 0; // RPM
 float lastKnownPosL = 0;
 float lastKnownPosR = 0;
 
@@ -55,9 +60,11 @@ const float wheelCirc = 3.14 * 0.8; // Circumference in metres
 Motor motorL = Motor(BIN1, BIN2, PWMB, offsetB, STBY);
 Motor motorR = Motor(AIN1, AIN2, PWMA, offsetA, STBY);
 
+// Flags for the encoder triggers - Mainly for debugging
 bool Lfired = 0;
 bool Rfired = 0;
 
+// Encoder tracking flags
 bool running = 1;
 bool Lrun = 1;
 bool Rrun = 1;
@@ -69,22 +76,46 @@ int ROld = 0; // Previous encoder value right motor
 int LNew = 0; // New encoder value left motor
 int RNew = 0; // New encoder value right motor
 
+unsigned int counter1 = 0;
+
+TIM_TypeDef *Instance1 = TIM1;
+HardwareTimer *Timer1 = new HardwareTimer(Instance1);
+
+// PID Configuration parameters
+//Specify the links and initial tuning parameters
+double Kp=2, Ki=5, Kd=1;
+
+//PID pidRight(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+//PID pidLeft(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
+
+// Speed Calc Callback
+void speedCalc_callback(void){ // Every 100ms
+  // Calc Left Motor Speed
+  wheelSpeedL = 600 * (encoderPosL/fullRev)/0.2; // RPM angular_vel = da/dt
+  wheelSpeedR = 600 * (encoderPosR/fullRev)/0.2; // RPM
+  encoderPosL = 0;
+  encoderPosR = 0;
+  //Serial.println("tick"); CAN'T USE SERIAL PRINT IN STM32 BOARDS IN INTERRUPTS
+}
+
 // Left Hall encoder. Called once for each sensor on pin-change (quadrature)
-void encoderLeft_callback(){
+void encoderLeft_callback(void){
   if(Lrun){
     LOld = LNew;
     LNew = digitalRead(encoderLA) * 2 + digitalRead(encoderLB); // Convert binary input to decimal value // (PINC & 0b0001) gets the value of bit zero in port C (A0), ((PINC & 0b0010) >> 1) gets just the value of A1
-    encoderPosL = encoderPosL + QEM[LOld * 4 + LNew];
+    encoderPosL += QEM[LOld * 4 + LNew];
+    wheelSpeedDistanceL += QEM[LOld * 4 + LNew];
     Lfired = 1;
   }
 }
 
 // Right Hall encoder. Called once for each sensor on pin-change (quadrature)
-void encoderRight_callback(){
+void encoderRight_callback(void){
   if(Rrun){
     ROld = RNew;
     RNew = digitalRead(encoderRA) * 2 + digitalRead(encoderRB); // Convert binary input to decimal value // (PINC & 0b0001) gets the value of bit zero in port C (A0), ((PINC & 0b0010) >> 1) gets just the value of A1
-    encoderPosR = encoderPosR + QEM[ROld * 4 + RNew];
+    encoderPosR += QEM[ROld * 4 + RNew];
+    wheelSpeedDistanceR += QEM[ROld * 4 + RNew];
     Rfired = 1;
   }
 }
@@ -151,7 +182,7 @@ void printScaledAGMT(ICM_20948_SPI *sensor){
 void setup(){
   Serial.begin(115200);
   while (!Serial){};
-
+  //pinMode(LED_BUILTIN, OUTPUT);
   // Configure Encoder Pins
   pinMode (encoderLA, INPUT);
   pinMode (encoderLB, INPUT);
@@ -165,39 +196,51 @@ void setup(){
   attachInterrupt(encoderLB, encoderLeft_callback, CHANGE);
   attachInterrupt(encoderRA, encoderRight_callback, CHANGE);
   attachInterrupt(encoderRB, encoderRight_callback, CHANGE);
-  Serial.println("Motor Pin Configured");
+  //Serial.println("Motor Pin Configured");
 
   brake(motorL, motorR);
-  Serial.println("Motor Brakes Applied");
+  //Serial.println("Motor Brakes Applied");
 
   delay(200);
+  //Serial.println("After Delay");
   lastKnownPosL = encoderPosR / stripLPI * 25.4;
   lastKnownPosL = encoderPosR / stripLPI * 25.4;
 
+  //Serial.print("Initializing IMU... ");
   // Initialise IMU with SPI
   myICM.begin(CS_PIN, SPI_PORT);
 
   bool initialized = false;
   while (!initialized){
-    Serial.print(F("Initialization of the sensor returned: "));
-    Serial.println(myICM.statusString());
+    //Serial.print(F("Initialization of the sensor returned: "));
+    //Serial.println(myICM.statusString());
 
     if(myICM.status != ICM_20948_Stat_Ok){
-      Serial.println("Trying again...");
+      //Serial.println("Trying again...");
       delay(500);
     } else {
       initialized = true;
+      //Serial.print("Initialized");
     }
   }
 
+  //Serial.print("Activating Timer");
+  // Configure Speed calculation interrupt with Timer1
+  //Timer1->setOverflow(100000, MICROSEC_FORMAT); // 10 Hz // HERTZ_FORMAT
+  noInterrupts();
+      Timer1->setOverflow(200000, MICROSEC_FORMAT);
+      Timer1->attachInterrupt(speedCalc_callback);
+  interrupts();
+  Timer1->resume();
 }
 
 void loop(){
-  const int desiredDistance = 10*fullRev;
+  const int desiredDistance = 3*fullRev;
 
   if(running == 1){
-
-    if (myICM.dataReady()){
+    //Serial.println(counter1);
+    //Serial.println("test");
+    /*if (myICM.dataReady()){
       myICM.getAGMT();         // The values are only updated when you call 'getAGMT'
       
       //printRawAGMT( myICM.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
@@ -205,38 +248,46 @@ void loop(){
       delay(30);
 
     }else{
-
       Serial.println("Waiting for data");
       delay(500);
-    }
+    }*/
+    //Serial.print(wheelSpeedDistanceL);
+    //Serial.print("\t");
+    //Serial.print(wheelSpeedDistanceR);
+    //Serial.print("\t");
+    Serial.print(20);
+    Serial.print("\t");
+    Serial.print(wheelSpeedL);
+    Serial.print("\t");
+    Serial.println(wheelSpeedR);
 
-    if(encoderPosR >= desiredDistance){
-      if(Rrun)
+    if(wheelSpeedDistanceR >= desiredDistance){
+      if(Rrun){
         Rrun = 0;
-      
+      }
       motorR.brake();
     }else{
       motorR.drive(200);
     }
 
-    if(encoderPosL >= desiredDistance){
-      if(Lrun)
+    if(wheelSpeedDistanceL >= desiredDistance){
+      if(Lrun){
         Lrun = 0;
-            
+      }
       motorL.brake();
     }else{
       motorL.drive(200);
     }
 
-    if((encoderPosL >= desiredDistance) && (encoderPosR >= desiredDistance)){
-      Serial.print(encoderPosL);
+    if((wheelSpeedDistanceL >= desiredDistance) && (wheelSpeedDistanceR >= desiredDistance)){
+      /*Serial.print(wheelSpeedDistanceR);
       Serial.print("\t");
-      Serial.println(encoderPosR);
+      Serial.println(wheelSpeedDistanceR);
       Serial.print("Both motors stopped at distance: Left: ");
-      Serial.print((encoderPosL/desiredDistance) * wheelCirc);
+      Serial.print((wheelSpeedDistanceL/desiredDistance) * wheelCirc);
       Serial.print("m ");
-      Serial.print((encoderPosR/desiredDistance) * wheelCirc);
-      Serial.print("m ");
+      Serial.print((wheelSpeedDistanceR/desiredDistance) * wheelCirc);
+      Serial.print("m ");*/
       running = 0;
     }
 
