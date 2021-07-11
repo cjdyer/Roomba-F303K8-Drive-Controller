@@ -116,6 +116,7 @@ bool speedCheck = 0;
 
 float rpm_coefficient = ((600 / 0.05) / fullRev);
 
+
 // Speed Calc Callback
 void speedCalc_callback(void){
   if(encoderPosL > 0)
