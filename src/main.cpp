@@ -310,14 +310,14 @@ void setup(){
 */
   Serial.print("Activating Timer");
   // Configure Speed calculation interrupt with Timer1
-  //Timer1->setOverflow(100000, MICROSEC_FORMAT); // 10 Hz // HERTZ_FORMAT
+  // Timer1->setOverflow(100000, MICROSEC_FORMAT); // 10 Hz // HERTZ_FORMAT
   delay(500);
   noInterrupts();
       //Timer1->setOverflow(100000, MICROSEC_FORMAT);
       Timer2->setOverflow(100, HERTZ_FORMAT);
       Timer2->attachInterrupt(speedCalc_callback);
   interrupts();
-  Timer2->resume();//*/
+  //Timer2->resume();//*/
   start_time = micros();
 }
 
@@ -325,11 +325,13 @@ void loop(){
   const int desiredDistance = fullRev;
   
   if(running == 1){
-    /*if(Lfired){
-      Serial.print(wheelSpeedL);
-      Serial.print("\t");
-      Serial.println(encoderPosL);
+    ///*
+    if(Lfired || Rfired){
       Lfired = 0;
+      Rfired = 0;
+      Serial.print(encoderPosL);
+      Serial.print("\t");
+      Serial.println(encoderPosR);
     }//*/
     //Serial.print(counter1);
     //Serial.print("\t");
@@ -369,7 +371,7 @@ void loop(){
 
 //wheelSpeedL = 60 * (encoderPosL/fullRev)/0.01;
 
-    ///*
+    /*
     Lrun = 1;
     pidLeft.Compute();
     for(int i=0; i <= 250; i++){
@@ -389,7 +391,7 @@ void loop(){
       Serial.print("\t");
       Serial.println(speedL_pwm);
       motorL.drive(i);
-      delay(50);
+      delay(20);
     }
     for(int i=0; i <= 250; i++){
       //wheelSpeedL_desired = map(i, 0, 250, 0, 20);
@@ -400,7 +402,7 @@ void loop(){
       Serial.print("\t");
       Serial.print((encoderPosL/fullRev));
       Serial.print("\t");
-      Serial.print(i);
+      Serial.print(255);
       Serial.print("\t");
       Serial.print(wheelSpeedL_desired);
       Serial.print("\t");
@@ -408,7 +410,7 @@ void loop(){
       Serial.print("\t");
       Serial.println(speedL_pwm);
       motorL.drive(255);
-      delay(50);
+      delay(20);
     }
     for(int i=250; i >= 0; i--){
       //Serial.print("Left speed set to ");
@@ -427,7 +429,7 @@ void loop(){
       Serial.print("\t");
       Serial.println(speedL_pwm);
       motorL.drive(i);
-      delay(50);
+      delay(20);
     }//*/
     //running = 0;
     //Timer1->pause();
@@ -467,7 +469,7 @@ void loop(){
       Serial.print(speedTotalL/counter1);
       Serial.print(" : ");
       Serial.println(speedTotalR/counter1);*/
-      delay(2000);
+      //delay(2000);
     //}
   }else{
     brake(motorL, motorR);
