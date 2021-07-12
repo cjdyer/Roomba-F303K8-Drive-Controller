@@ -38,130 +38,147 @@
 // Configure SPI for IMU
 ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
 
-volatile long encoderPosL = 0;
-volatile long encoderPosR = 0;
-double wheelSpeedL = 0; // RPM
-double wheelSpeedR = 0; // RPM
-
-double wheelSpeedL_desired = 0;
-double wheelSpeedR_desired = 0;
-
-double speedTotalL = 0;
-double speedTotalR = 0;
-
-double speedL_error = 0;
-double speedR_error = 0;
-
-double speedL_error_pre = 0; // RPM
-double speedR_error_pre = 0; // RPM
-
-double speedL_pwm= 0; // RPM
-double speedR_pwm = 0; // RPM
-
-double speedL_esum = 0; // RPM
-double speedR_esum = 0; // RPM
-
-long wheelSpeedDistanceL = 0; // RPM
-long wheelSpeedDistanceR = 0; // RPM
-float lastKnownPosL = 0;
-float lastKnownPosR = 0;
-
-float ticks_per_millisecondL = 0;
-float ticks_per_millisecondR = 0;
-
-// Set offset values to adjust motor direction if necessary. Values: 1 or -1
-const int offsetA = 1;
-const int offsetB = 1;
+//volatile long encoderPosL = 0;
+//volatile long encoderPosR = 0;
 
 // Ticks per drive-shaft revolution (different per motor/gearbox)
-const float fullRev = 1632.67;
-const float wheelCirc = 3.14 * 0.8; // Circumference in metres
+const float fullRev         = 1632.67;
+const float wheelCirc       = 3.14 * 0.8; // Circumference in metres
+const float rpm_coefficient = ((600 / 0.05) / fullRev);
 
 // PID Configuration parameters
 // Specify the links and initial tuning parameters
 struct motorPID {
-  double kp = 2.0;
-  double ki = 5.0;
-  double kd = 1.0;
-
+  volatile long encoderPos     = 0; // Current encoder position since the last clearance
+  double speedTotal            = 0; // Sum of speed measurements
+  double speedError            = 0; // Difference between 
+  double speedError_pre        = 0; // Error 
+  double speedErrorSum         = 0; // Sum of errors
+  double speed                 = 0; // Calculated wheel speed in RPM
+  double speedDesired          = 0; // PID Set Point
+  double speedPWM              = 0; // RPM
+  double kp                    = 2.0; // Proportional coefficient
+  double ki                    = 5.0; // Integral coefficient
+  double kd                    = 1.0; // Derivative coefficient
   
-};
+  float  lastKnownPos          = 0; // Last Known Position
+  float  ticks_per_millisecond = 0;
+  
+  long   wheelSpeedDistance    = 0; // RPM
+} motorL_PID, motorR_PID;
 
-struct motorPID motorL_PID;
-struct motorPID motorR_PID;
-
+//******************************//
+//******* MOTOR SETUP **********//
+//******************************//
+const int offsetA = 1; //  Set offset values to adjust motor direction if necessary. Values: 1 or -1
+const int offsetB = 1;
 
 // Initialise motor objects
 Motor motorL = Motor(BIN1, BIN2, PWMB, offsetB, STBY);
 Motor motorR = Motor(AIN1, AIN2, PWMA, offsetA, STBY);
 
-//PID pidRight(&Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT);
-PID pidLeft(&wheelSpeedL, &speedL_pwm, &wheelSpeedL_desired, kp, ki, kd, DIRECT);
+
+//******************************//
+//******* PID SETUP ************//
+//******************************//
+
+PID pidLeft(&motorL_PID.speed, &motorL_PID.speedPWM, &motorL_PID.speedDesired, motorL_PID.kp, motorL_PID.ki, motorL_PID.kd, DIRECT);
+PID pidRight(&motorR_PID.speed, &motorR_PID.speedPWM, &motorR_PID.speedDesired, motorR_PID.kp, motorR_PID.ki, motorR_PID.kd, DIRECT);
+
+
+//******************************//
+//******* TIMER SETUP **********//
+//******************************//
 TIM_TypeDef *Instance1 = TIM2;
 HardwareTimer *Timer1 = new HardwareTimer(Instance1);
 
-// Flags for the encoder triggers - Mainly for debugging
-bool Lfired = 0;
-bool Rfired = 0;
+//******************************//
+//******* EVENT FLAGS **********//
+//   
+//  Flags for the encoder triggers 
+//  (Mainly for debugging)
+//******************************//
+bool running    = 1;
+bool Lfired     = 0; // Left encoder has fired
+bool Rfired     = 0; // Left encoder has fired
+bool Lrun       = 1; // Process left encoder
+bool Rrun       = 1; // Process right encoder
+bool speedCheck = 0; // Timer speed calculator flag
 
-// Encoder tracking flags
-bool running = 1;
-bool Lrun = 1;
-bool Rrun = 1;
+int iter        = 1; // Loop counter
+int iter_coeff  = 1;
 
-// Quadrature Encoder matrix - 2s shouldn't ever appear Sauce: https://cdn.sparkfun.com/datasheets/Robotics/How%20to%20use%20a%20quadrature%20encoder.pdf
+
+//******************************//
+//******* TIMER SETUP **********//
+//  Quadrature Encoder matrix
+//  2s shouldn't ever appear
+//  Sauce: https://cdn.sparkfun.com/datasheets/Robotics/How%20to%20use%20a%20quadrature%20encoder.pdf
+//******************************//
 int QEM [16] = {0,-1,1,2,1,0,2,-1,-1,2,0,1,2,1,-1,0}; 
 int LOld = 0; // Previous encoder value left motor
 int ROld = 0; // Previous encoder value right motor
 int LNew = 0; // New encoder value left motor
 int RNew = 0; // New encoder value right motor
 
-unsigned int counter1 = 0;
-int iter = 1;
 
-unsigned int start_time;
-unsigned int end_time;
-bool speedCheck = 0;
+//******************************//
+//**** TACHOMETER SETUP ********//
+//******************************//
+struct tacho
+{
+  const uint16_t          PulsesPerRevolution = 1633; // Encoder pulses for 1 full rotation (Quadrature)
+  const unsigned long     ZeroTimeout = 100000;       // If the period between pulses is too high, or even if the pulses stopped, then we would get stuck showing the
+                                                      // last value instead of a 0. Because of this we are going to set a limit for the maximum period allowed.
+                                                      // If the period is above this value, the RPM will show as 0.
+                                                      // The higher the set value, the longer lag/delay will have to sense that pulses stopped, but it will allow readings
+                                                      // at very low RPM.
+                                                      // Setting a low value is going to allow the detection of stop situations faster, but it will prevent having low RPM readings.
+                                                      // The unit is in microseconds.
+  const byte              numReadings = 10;            // Number of samples for smoothing. The higher, the more smoothing, but it's going to
+                                                      // react slower to changes. 1 = no smoothing. Default: 2.
+  volatile unsigned long  LastTimeWeMeasured;         // Time at the last pulse
+  volatile unsigned long  PeriodBetweenPulses = ZeroTimeout+1000; // Stores the period between pulses in microseconds.
+                                                                  // It has a big number so it doesn't start with 0 which would be interpreted as a high frequency.
+  volatile unsigned long  PeriodAverage = ZeroTimeout+1000;       // Stores the period between pulses in microseconds in total, if we are taking multiple pulses.
 
-float rpm_coefficient = ((600 / 0.05) / fullRev);
+  unsigned long   CurrentMicros = micros(); // Micros at the current cycle
+  unsigned long   FrequencyRaw;             // Calculated frequency, based on the period. This has a lot of extra decimals without the decimal point.
+  unsigned long   FrequencyReal;            // Frequency without decimals.
+  unsigned long   PeriodSum;                // Stores the summation of all the periods to do the average.
+  unsigned long   RPM;                      // Raw RPM without any processing.
+  unsigned long   LastTimeCycleMeasure = LastTimeWeMeasured; // Stores the last time we measure a pulse in that cycle.
+                                      // We need a variable with a value that is not going to be affected by the interrupt
+                                      // because we are going to do math and functions that are going to mess up if the values
+                                      // changes in the middle of the cycle.
+  unsigned int    PulseCounter = 1;         // Counts the amount of pulse readings we took so we can average multiple pulses before calculating the period.
+  unsigned int    AmountOfReadings = 1;     // Stores the last time we measure a pulse in that cycle.
+                                            // We need a variable with a value that is not going to be affected by the interrupt
+                                            // because we are going to do math and functions that are going to mess up if the values
+                                            // changes in the middle of the cycle.
+  unsigned int    ZeroDebouncingExtra;      // Stores the extra value added to the ZeroTimeout to debounce it.
 
-const uint16_t PulsesPerRevolution = 1633;
-const unsigned long ZeroTimeout = 100000; 
-const byte numReadings = 10;
-volatile unsigned long LastTimeWeMeasured;
-unsigned long CurrentMicros = micros();
-volatile unsigned long PeriodBetweenPulses = ZeroTimeout+1000;
-volatile unsigned long PeriodAverage = ZeroTimeout+1000;
-unsigned long FrequencyRaw;
-unsigned long FrequencyReal;
-unsigned long RPM;
-unsigned int PulseCounter = 1;
-unsigned long PeriodSum;
-unsigned long LastTimeCycleMeasure = LastTimeWeMeasured;
-unsigned int AmountOfReadings = 1;
-unsigned int ZeroDebouncingExtra;
-
-// Variables for smoothing tachometer:
-unsigned long readings[numReadings];  // The input.
-unsigned long readIndex;  // The index of the current reading.
-unsigned long total;  // The running total.
-unsigned long average;  // The RPM value after applying the smoothing.
+  // Variables for smoothing tachometer:
+  unsigned long readings[10];  // The input. // [numReadings]
+  unsigned long readIndex;  // The index of the current reading.
+  unsigned long total;  // The running total.
+  unsigned long average;  // The RPM value after applying the smoothing.
+} tachoL, tachoR;
 
 // Speed Calc Callback
 void speedCalc_callback(void){
-  if(encoderPosL > 0)
-    wheelSpeedL = encoderPosL * rpm_coefficient; // RPM angular_vel = da/dt * 600 (convert to minutes)    //wheelSpeedL = 600 * (encoderPosL/fullRev)/0.01; 
+  if(motorL_PID.encoderPos > 0)
+    motorL_PID.speed = motorL_PID.encoderPos * rpm_coefficient; // RPM angular_vel = da/dt * 600 (convert to minutes)    //wheelSpeedL = 600 * (encoderPosL/fullRev)/0.01;
   
-  if(encoderPosR > 0)
-    wheelSpeedR = encoderPosR * rpm_coefficient; // RPM
+  if(motorR_PID.encoderPos > 0)
+    motorR_PID.speed = motorR_PID.encoderPos * rpm_coefficient; // RPM
 
-  speedTotalL += wheelSpeedL;
-  speedTotalR += wheelSpeedR;
+  motorL_PID.speedTotal += motorL_PID.speed;
+  motorR_PID.speedTotal += motorR_PID.speed;
 
-  encoderPosL = 0;
-  encoderPosR = 0;
+  motorL_PID.encoderPos = 0;
+  motorR_PID.encoderPos = 0;
   
-  counter1++;
   speedCheck  = 1;
 
 /*
@@ -199,27 +216,27 @@ void encoderLeft_callback(void){
     Lfired = 1; 
   }*/
   
-  PeriodBetweenPulses   = micros() - LastTimeWeMeasured;
-  LastTimeWeMeasured    = micros();
+  tachoL.PeriodBetweenPulses   = micros() - tachoL.LastTimeWeMeasured;
+  tachoL.LastTimeWeMeasured    = micros();
   
-  if(PulseCounter >= AmountOfReadings)  // If counter for amount of readings reach the set limit:
+  if(tachoL.PulseCounter >= tachoL.AmountOfReadings)  // If counter for amount of readings reach the set limit:
   {
-    PeriodAverage = PeriodSum / AmountOfReadings;
-    PulseCounter = 1;  // Reset the counter to start over. The reset value is 1 because its the minimum setting allowed (1 reading).
-    PeriodSum = PeriodBetweenPulses;  // Reset PeriodSum to start a new averaging operation.
+    tachoL.PeriodAverage  = tachoL.PeriodSum / tachoL.AmountOfReadings;
+    tachoL.PulseCounter   = 1;  // Reset the counter to start over. The reset value is 1 because its the minimum setting allowed (1 reading).
+    tachoL.PeriodSum      = tachoL.PeriodBetweenPulses;  // Reset PeriodSum to start a new averaging operation.
 
-    int RemapedAmountOfReadings = map(PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
-    // 1st value is what are we going to remap. In this case is the PeriodBetweenPulses.
-    // 2nd value is the period value when we are going to have only 1 reading. The higher it is, the lower RPM has to be to reach 1 reading.
-    // 3rd value is the period value when we are going to have 10 readings. The higher it is, the lower RPM has to be to reach 10 readings.
-    // 4th and 5th values are the amount of readings range.
+    int RemapedAmountOfReadings = map(tachoL.PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
+                                // 1st value is what are we going to remap. In this case is the PeriodBetweenPulses.
+                                // 2nd value is the period value when we are going to have only 1 reading. The higher it is, the lower RPM has to be to reach 1 reading.
+                                // 3rd value is the period value when we are going to have 10 readings. The higher it is, the lower RPM has to be to reach 10 readings.
+                                // 4th and 5th values are the amount of readings range.
     RemapedAmountOfReadings = constrain(RemapedAmountOfReadings, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
-    AmountOfReadings = RemapedAmountOfReadings;  // Set amount of readings as the remaped value.
+    tachoL.AmountOfReadings = RemapedAmountOfReadings;  // Set amount of readings as the remaped value.
   }
   else
   {
-    PulseCounter++;  // Increase the counter for amount of readings by 1.
-    PeriodSum = PeriodSum + PeriodBetweenPulses;  // Add the periods so later we can average.
+    tachoL.PulseCounter++;  // Increase the counter for amount of readings by 1.
+    tachoL.PeriodSum = tachoL.PeriodSum + tachoL.PeriodBetweenPulses;  // Add the periods so later we can average.
   }
 } // end encoderLeft_callback
 
@@ -234,6 +251,29 @@ void encoderRight_callback(void){
     wheelSpeedDistanceR += QEM[ROld * 4 + RNew];
     Rfired = 1;
   }*/
+
+  tachoR.PeriodBetweenPulses   = micros() - tachoR.LastTimeWeMeasured;
+  tachoR.LastTimeWeMeasured    = micros();
+  
+  if(tachoR.PulseCounter >= tachoR.AmountOfReadings)  // If counter for amount of readings reach the set limit:
+  {
+    tachoR.PeriodAverage  = tachoR.PeriodSum / tachoR.AmountOfReadings;
+    tachoR.PulseCounter   = 1;  // Reset the counter to start over. The reset value is 1 because its the minimum setting allowed (1 reading).
+    tachoR.PeriodSum      = tachoR.PeriodBetweenPulses;  // Reset PeriodSum to start a new averaging operation.
+
+    int RemapedAmountOfReadings = map(tachoR.PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
+                                // 1st value is what are we going to remap. In this case is the PeriodBetweenPulses.
+                                // 2nd value is the period value when we are going to have only 1 reading. The higher it is, the lower RPM has to be to reach 1 reading.
+                                // 3rd value is the period value when we are going to have 10 readings. The higher it is, the lower RPM has to be to reach 10 readings.
+                                // 4th and 5th values are the amount of readings range.
+    RemapedAmountOfReadings = constrain(RemapedAmountOfReadings, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
+    tachoR.AmountOfReadings = RemapedAmountOfReadings;  // Set amount of readings as the remaped value.
+  }
+  else
+  {
+    tachoR.PulseCounter++;  // Increase the counter for amount of readings by 1.
+    tachoR.PeriodSum = tachoR.PeriodSum + tachoR.PeriodBetweenPulses;  // Add the periods so later we can average.
+  }
 }
 
 void printFormattedFloat(float val, uint8_t leading, uint8_t decimals){
@@ -319,8 +359,8 @@ void setup(){
 
   delay(200);
   Serial.println("After Delay");
-  lastKnownPosL = encoderPosR / stripLPI * 25.4;
-  lastKnownPosR = encoderPosL / stripLPI * 25.4;
+  motorL_PID.lastKnownPos = motorL_PID.encoderPos / stripLPI * 25.4;
+  motorR_PID.lastKnownPos = motorR_PID.encoderPos / stripLPI * 25.4;
 
   //Serial.print("Initializing IMU... ");
   // Initialise IMU with SPI
@@ -340,8 +380,8 @@ void setup(){
       initialized = true;
       Serial.print("Initialized");
     }
-  }
-*/
+  }*/
+
   Serial.println("Activating Timer");
   // Configure Speed calculation interrupt with Timer1
   // Timer1->setOverflow(100000, MICROSEC_FORMAT); // 10 Hz // HERTZ_FORMAT
@@ -352,7 +392,6 @@ void setup(){
       Timer1->attachInterrupt(speedCalc_callback);
   interrupts();
   Timer1->resume();//*/
-  start_time = micros();
 }
 
 // Print value (little endian) as binary to serial
@@ -365,24 +404,19 @@ void printBin(uint16_t input){
   }
 }
 
-int iter_coeff = 1;
-
 void loop(){
   if(running == 1){
-
     pidLeft.Compute();
     if(iter > 0)
     {
       iter += iter_coeff;
-      wheelSpeedL_desired = map(iter, 0, 250, 0, 20);
+      motorL_PID.speedDesired = map(iter, 0, 250, 0, 20);
       motorL.drive(iter);
-      //motorR.drive(iter);
+      motorR.drive(iter);
       if(iter == 255){
         iter_coeff = -1;
-        //Serial.println("Switch dir");
       }
-      delay(20);
-    
+      delay(20);    
     }
     else
     {
@@ -395,68 +429,123 @@ void loop(){
     // The following is going to store the two values that might change in the middle of the cycle.
     // We are going to do math and functions with those values and they can create glitches if they change in the
     // middle of the cycle.
-    LastTimeCycleMeasure = LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
-    CurrentMicros = micros();  // Store the micros() in a variable.
+    tachoL.LastTimeCycleMeasure = tachoL.LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
+    tachoL.CurrentMicros = micros();  // Store the micros() in a variable.
 
     // CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
     // I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
     // LastTimeCycleMeasure I set it as the CurrentMicros.
     // The need of fixing this is that we later use this information to see if pulses stopped.
-    if(CurrentMicros < LastTimeCycleMeasure)
+    if(tachoL.CurrentMicros < tachoL.LastTimeCycleMeasure)
     {
-      LastTimeCycleMeasure = CurrentMicros;
+      tachoL.LastTimeCycleMeasure = tachoL.CurrentMicros;
     }
 
     // Calculate the frequency:
-    FrequencyRaw = 10000000000 / PeriodAverage;  // Calculate the frequency using the period between pulses.
+    tachoL.FrequencyRaw = 10000000000 / tachoL.PeriodAverage;  // Calculate the frequency using the period between pulses.
 
     // Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
-    if(PeriodBetweenPulses > ZeroTimeout - ZeroDebouncingExtra || CurrentMicros - LastTimeCycleMeasure > ZeroTimeout - ZeroDebouncingExtra)
+    if( tachoL.PeriodBetweenPulses > tachoL.ZeroTimeout          - tachoL.ZeroDebouncingExtra || 
+        tachoL.CurrentMicros       - tachoL.LastTimeCycleMeasure > tachoL.ZeroTimeout         - tachoL.ZeroDebouncingExtra)
     {  // If the pulses are too far apart that we reached the timeout for zero:
-      FrequencyRaw = 0;  // Set frequency as 0.
-      ZeroDebouncingExtra = 2000;  // Change the threshold a little so it doesn't bounce.
+      tachoL.FrequencyRaw = 0;  // Set frequency as 0.
+      tachoL.ZeroDebouncingExtra = 2000;  // Change the threshold a little so it doesn't bounce.
     }
     else
     {
-      ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
+      tachoL.ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
     }
 
-    FrequencyReal = FrequencyRaw / 10000;  // Get frequency without decimals.
+    tachoL.FrequencyReal = tachoL.FrequencyRaw / 10000;  // Get frequency without decimals.
                                         // This is not used to calculate RPM but we remove the decimals just in case
                                         // you want to print it.
 
     // Calculate the RPM:
-    RPM = FrequencyRaw / PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
+    tachoL.RPM = tachoL.FrequencyRaw / tachoL.PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
                                                 // 60 seconds to get minutes.
-    RPM = RPM / 10000;  // Remove the decimals.
+    tachoL.RPM = tachoL.RPM / 10000;  // Remove the decimals.
 
     // Smoothing RPM:
-    total = total - readings[readIndex];  // Advance to the next position in the array.
-    readings[readIndex] = RPM;            // Takes the value that we are going to smooth.
-    total = total + readings[readIndex];  // Add the reading to the total.
-    readIndex = readIndex + 1;            // Advance to the next position in the array.
+    tachoL.total = tachoL.total - tachoL.readings[tachoL.readIndex];  // Advance to the next position in the array.
+    tachoL.readings[tachoL.readIndex] = tachoL.RPM;            // Takes the value that we are going to smooth.
+    tachoL.total = tachoL.total + tachoL.readings[tachoL.readIndex];  // Add the reading to the total.
+    tachoL.readIndex = tachoL.readIndex + 1;            // Advance to the next position in the array.
 
-    if (readIndex >= numReadings)  // If we're at the end of the array:
+    if (tachoL.readIndex >= tachoL.numReadings)  // If we're at the end of the array:
     {
-      readIndex = 0;  // Reset array index.
+      tachoL.readIndex = 0;  // Reset array index.
     }
 
     // Calculate the average:
-    average = total / numReadings;  // The average value it's the smoothed result.
+    tachoL.average = tachoL.total / tachoL.numReadings;  // The average value it's the smoothed result.
+
+
+
+    // The following is going to store the two values that might change in the middle of the cycle.
+    // We are going to do math and functions with those values and they can create glitches if they change in the
+    // middle of the cycle.
+    tachoR.LastTimeCycleMeasure = tachoR.LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
+    tachoR.CurrentMicros = micros();  // Store the micros() in a variable.
+
+    // CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
+    // I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
+    // LastTimeCycleMeasure I set it as the CurrentMicros.
+    // The need of fixing this is that we later use this information to see if pulses stopped.
+    if(tachoR.CurrentMicros < tachoR.LastTimeCycleMeasure)
+    {
+      tachoR.LastTimeCycleMeasure = tachoR.CurrentMicros;
+    }
+
+    // Calculate the frequency:
+    tachoR.FrequencyRaw = 10000000000 / tachoR.PeriodAverage;  // Calculate the frequency using the period between pulses.
+
+    // Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
+    if( tachoR.PeriodBetweenPulses > tachoR.ZeroTimeout          - tachoR.ZeroDebouncingExtra || 
+        tachoR.CurrentMicros       - tachoR.LastTimeCycleMeasure > tachoR.ZeroTimeout         - tachoR.ZeroDebouncingExtra)
+    {  // If the pulses are too far apart that we reached the timeout for zero:
+      tachoR.FrequencyRaw = 0;  // Set frequency as 0.
+      tachoR.ZeroDebouncingExtra = 2000;  // Change the threshold a little so it doesn't bounce.
+    }
+    else
+    {
+      tachoR.ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
+    }
+
+    tachoR.FrequencyReal = tachoR.FrequencyRaw / 10000;  // Get frequency without decimals.
+                                        // This is not used to calculate RPM but we remove the decimals just in case
+                                        // you want to print it.
+
+    // Calculate the RPM:
+    tachoR.RPM = tachoR.FrequencyRaw / tachoR.PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
+                                                // 60 seconds to get minutes.
+    tachoR.RPM = tachoR.RPM / 10000;  // Remove the decimals.
+
+    // Smoothing RPM:
+    tachoR.total = tachoR.total - tachoR.readings[tachoR.readIndex];  // Advance to the next position in the array.
+    tachoR.readings[tachoR.readIndex] = tachoR.RPM;            // Takes the value that we are going to smooth.
+    tachoR.total = tachoR.total + tachoR.readings[tachoR.readIndex];  // Add the reading to the total.
+    tachoR.readIndex = tachoR.readIndex + 1;            // Advance to the next position in the array.
+
+    if (tachoR.readIndex >= tachoR.numReadings)  // If we're at the end of the array:
+    {
+      tachoR.readIndex = 0;  // Reset array index.
+    }
+    
+    // Calculate the average:
+    tachoR.average = tachoR.total / tachoR.numReadings;  // The average value it's the smoothed result.
 
     // Print information on the serial monitor:
     // Comment this section if you have a display and you don't need to monitor the values on the serial monitor.
     // This is because disabling this section would make the loop run faster.
     Serial.print(iter);
     Serial.print("\t");
-    Serial.print(RPM);
+    Serial.print(tachoL.RPM);
     Serial.print("\t");
-    Serial.println(average); // Tachometer
-
-// ###########################################
-// ###########################################
-// ###########################################
-
+    Serial.print(tachoL.average); // Tachometer
+    Serial.print("\t");
+    Serial.print(tachoR.RPM);
+    Serial.print("\t");
+    Serial.println(tachoR.average); // Tachometer
   }
   else
   {
