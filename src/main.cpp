@@ -27,7 +27,6 @@
 #define stripLPI 150.0
 
 /* IMU definitions */
-
 #define SPI_PORT SPI  // Your desired SPI port.       Used only when "USE_SPI" is defined
 #define CS_PIN 10     // Which pin you connect CS to. Used only when "USE_SPI" is defined
 
@@ -44,14 +43,14 @@ volatile long encoderPosR = 0;
 double wheelSpeedL = 0; // RPM
 double wheelSpeedR = 0; // RPM
 
-double wheelSpeedL_desired = 0; // RPM
-double wheelSpeedR_desired = 0; // RPM
+double wheelSpeedL_desired = 0;
+double wheelSpeedR_desired = 0;
 
-double speedTotalL = 0; // RPM
-double speedTotalR = 0; // RPM
+double speedTotalL = 0;
+double speedTotalR = 0;
 
-double speedL_error = 0; // RPM
-double speedR_error = 0; // RPM
+double speedL_error = 0;
+double speedR_error = 0;
 
 double speedL_error_pre = 0; // RPM
 double speedR_error_pre = 0; // RPM
@@ -80,7 +79,17 @@ const float wheelCirc = 3.14 * 0.8; // Circumference in metres
 
 // PID Configuration parameters
 // Specify the links and initial tuning parameters
-double kp = 2.0, ki = 5.0, kd = 1.0;
+struct motorPID {
+  double kp = 2.0;
+  double ki = 5.0;
+  double kd = 1.0;
+
+  
+};
+
+struct motorPID motorL_PID;
+struct motorPID motorR_PID;
+
 
 // Initialise motor objects
 Motor motorL = Motor(BIN1, BIN2, PWMB, offsetB, STBY);
@@ -155,8 +164,6 @@ void speedCalc_callback(void){
   counter1++;
   speedCheck  = 1;
 
-  //wheelSpeedL = map(wheelSpeedL, 0, 15, 0, 255);
-
 /*
   if(Lrun){
     speedL_error = wheelSpeedL_desired - wheelSpeedL;
@@ -177,18 +184,6 @@ void speedCalc_callback(void){
     speedL_pwm = 0;
   }
 */
-/*
-  if (speedL_pwm < 255 & speedL_pwm >0){
-    motorL.drive(speedL_pwm);
-
-  }else{
-    if (speedL_pwm>255){
-      motorL.drive(255);
-    }
-    else{
-      motorL.drive(0);
-    }
-  }*/
 
   //Serial.println("tick"); CAN'T USE SERIAL PRINT IN STM32 BOARDS IN INTERRUPTS
 }
@@ -374,89 +369,10 @@ int iter_coeff = 1;
 
 void loop(){
   if(running == 1){
-    /*for(int i=0; i <= 250; i++){
-      motorR.drive(100);
-      delay(10);
-    }*/
-    ///*
-    if(0){
-    
-    //if(speedCheck){
-      speedCheck = 0;
-      //Lfired = 0;
-      //Rfired = 0;
-      //Serial.print("#");
-      
-      //Serial.print(map(iter, 0, 250, 0, 20));
-      //Serial.print("\t");
-      //Serial.print(encoderPosL);
-      //Serial.print("\t");
-      //Serial.print(encoderPosR);
-      //Serial.print("\t");
-      //Serial.print(fullRev);
-      //Serial.print("\t");
-      
-      //Serial.print(600 * (encoderPosL/fullRev)/0.01);
-      //Serial.print("\t");
-      //Serial.print(600 * (encoderPosR/fullRev)/0.01);
-      //Serial.print("\t");
-
-      //Serial.print(encoderPosL * rpm_coefficient);
-      //Serial.print("\t");
-      //Serial.print((ticks_per_millisecondL / fullRev) * 60000);
-      //Serial.print("\t");
-      //Serial.print(encoderPosR / 0.01);
-      //Serial.print("\t");
-
-      Serial.print(iter);
-      Serial.print("\t");
-      Serial.print(wheelSpeedL);
-      Serial.print("\t");
-      Serial.println(wheelSpeedR);
-      //Serial.print("\t");
-      //Serial.println(speedL_pwm);
-    } //*/
-
-    //Serial.print(counter1);
-    //Serial.print("\t");
-    /*if (myICM.dataReady()){
-      myICM.getAGMT();         // The values are only updated when you call 'getAGMT'
-      
-      //printRawAGMT( myICM.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
-      printScaledAGMT(&myICM); // This function takes into account the scale settings from when the measurement was made to calculate the values with units
-      delay(30);
-
-    }else{
-      Serial.println("Waiting for data");
-      delay(500);
-    }*/
-    //Serial.print(wheelSpeedDistanceL);
-    //Serial.print("\t");
-    //Serial.println(encoderPosL);
-    //Serial.print("\t");
-    /*if(speedCheck){
-      Serial.print(wheelSpeedL);
-      Serial.print("\t");
-      Serial.print(speedL_pwm);
-      Serial.print("\t");
-      Serial.println(wheelSpeedR);
-      speedCheck = 0;
-    }*/
-
-    /*if(wheelSpeedDistanceR >= desiredDistance){
-      if(Rrun){
-        Rrun = 0;
-      }
-      motorR.brake();
-    }else{
-      //motorR.drive(150);
-      wheelSpeedL_desired = 10;
-    }//*/
-
-    //wheelSpeedL = 60 * (encoderPosL/fullRev)/0.01;
 
     pidLeft.Compute();
-    if(iter > 0){
+    if(iter > 0)
+    {
       iter += iter_coeff;
       wheelSpeedL_desired = map(iter, 0, 250, 0, 20);
       motorL.drive(iter);
@@ -467,139 +383,86 @@ void loop(){
       }
       delay(20);
     
-    }else{
+    }
+    else
+    {
       running = 0;
       Timer1->pause();
       Lrun = 0;
       Rrun = 0;
     }
 
-// ###########################################
-// ###########################################
-// ###########################################
+    // The following is going to store the two values that might change in the middle of the cycle.
+    // We are going to do math and functions with those values and they can create glitches if they change in the
+    // middle of the cycle.
+    LastTimeCycleMeasure = LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
+    CurrentMicros = micros();  // Store the micros() in a variable.
 
-///*
-// The following is going to store the two values that might change in the middle of the cycle.
-// We are going to do math and functions with those values and they can create glitches if they change in the
-// middle of the cycle.
-LastTimeCycleMeasure = LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
-CurrentMicros = micros();  // Store the micros() in a variable.
+    // CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
+    // I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
+    // LastTimeCycleMeasure I set it as the CurrentMicros.
+    // The need of fixing this is that we later use this information to see if pulses stopped.
+    if(CurrentMicros < LastTimeCycleMeasure)
+    {
+      LastTimeCycleMeasure = CurrentMicros;
+    }
 
-// CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
-// I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
-// LastTimeCycleMeasure I set it as the CurrentMicros.
-// The need of fixing this is that we later use this information to see if pulses stopped.
-if(CurrentMicros < LastTimeCycleMeasure)
-{
-  LastTimeCycleMeasure = CurrentMicros;
-}
+    // Calculate the frequency:
+    FrequencyRaw = 10000000000 / PeriodAverage;  // Calculate the frequency using the period between pulses.
 
-// Calculate the frequency:
-FrequencyRaw = 10000000000 / PeriodAverage;  // Calculate the frequency using the period between pulses.
+    // Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
+    if(PeriodBetweenPulses > ZeroTimeout - ZeroDebouncingExtra || CurrentMicros - LastTimeCycleMeasure > ZeroTimeout - ZeroDebouncingExtra)
+    {  // If the pulses are too far apart that we reached the timeout for zero:
+      FrequencyRaw = 0;  // Set frequency as 0.
+      ZeroDebouncingExtra = 2000;  // Change the threshold a little so it doesn't bounce.
+    }
+    else
+    {
+      ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
+    }
 
-// Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
-if(PeriodBetweenPulses > ZeroTimeout - ZeroDebouncingExtra || CurrentMicros - LastTimeCycleMeasure > ZeroTimeout - ZeroDebouncingExtra)
-{  // If the pulses are too far apart that we reached the timeout for zero:
-  FrequencyRaw = 0;  // Set frequency as 0.
-  ZeroDebouncingExtra = 2000;  // Change the threshold a little so it doesn't bounce.
-}
-else
-{
-  ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
-}
+    FrequencyReal = FrequencyRaw / 10000;  // Get frequency without decimals.
+                                        // This is not used to calculate RPM but we remove the decimals just in case
+                                        // you want to print it.
 
-FrequencyReal = FrequencyRaw / 10000;  // Get frequency without decimals.
-                                    // This is not used to calculate RPM but we remove the decimals just in case
-                                    // you want to print it.
+    // Calculate the RPM:
+    RPM = FrequencyRaw / PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
+                                                // 60 seconds to get minutes.
+    RPM = RPM / 10000;  // Remove the decimals.
 
-// Calculate the RPM:
-RPM = FrequencyRaw / PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
-                                            // 60 seconds to get minutes.
-RPM = RPM / 10000;  // Remove the decimals.
+    // Smoothing RPM:
+    total = total - readings[readIndex];  // Advance to the next position in the array.
+    readings[readIndex] = RPM;            // Takes the value that we are going to smooth.
+    total = total + readings[readIndex];  // Add the reading to the total.
+    readIndex = readIndex + 1;            // Advance to the next position in the array.
 
-// Smoothing RPM:
-total = total - readings[readIndex];  // Advance to the next position in the array.
-readings[readIndex] = RPM;  // Takes the value that we are going to smooth.
-total = total + readings[readIndex];  // Add the reading to the total.
-readIndex = readIndex + 1;  // Advance to the next position in the array.
+    if (readIndex >= numReadings)  // If we're at the end of the array:
+    {
+      readIndex = 0;  // Reset array index.
+    }
 
-if (readIndex >= numReadings)  // If we're at the end of the array:
-{
-  readIndex = 0;  // Reset array index.
-}
+    // Calculate the average:
+    average = total / numReadings;  // The average value it's the smoothed result.
 
-// Calculate the average:
-average = total / numReadings;  // The average value it's the smoothed result.
-
-// Print information on the serial monitor:
-// Comment this section if you have a display and you don't need to monitor the values on the serial monitor.
-// This is because disabling this section would make the loop run faster.
-//Serial.print("iter: ");
-Serial.print(iter);
-Serial.print("\t");
-//Serial.print("\tPeriod: ");
-//Serial.print(PeriodBetweenPulses);
-//Serial.print("\tReadings: ");
-//Serial.print(AmountOfReadings);
-//Serial.print("\tFrequency: ");
-//Serial.print(FrequencyReal);
-//Serial.print("\tRPM: ");
-Serial.print(RPM);
-Serial.print("\t");
-//Serial.print("\tTachometer: ");
-Serial.println(average);
-//Serial.println();
-
-//*/
+    // Print information on the serial monitor:
+    // Comment this section if you have a display and you don't need to monitor the values on the serial monitor.
+    // This is because disabling this section would make the loop run faster.
+    Serial.print(iter);
+    Serial.print("\t");
+    Serial.print(RPM);
+    Serial.print("\t");
+    Serial.println(average); // Tachometer
 
 // ###########################################
 // ###########################################
 // ###########################################
 
-    /*if(wheelSpeedDistanceL >= desiredDistance){
-      if(Lrun){
-        Lrun = 0;
-      }
-      motorL.brake();
-    }else{
-      wheelSpeedL_desired = 10;
-      //motorL.drive(150);
-    }*/
-
-    //if((wheelSpeedDistanceL >= desiredDistance) && (wheelSpeedDistanceR >= desiredDistance)){
-      //Timer1->pause();
-      /*Serial.print(wheelSpeedDistanceR);
-      Serial.print("\t");
-      Serial.println(wheelSpeedDistanceR);
-      Serial.print("Both motors stopped at distance: Left: ");
-      Serial.print((wheelSpeedDistanceL/desiredDistance) * wheelCirc);
-      Serial.print("m ");
-      Serial.print((wheelSpeedDistanceR/desiredDistance) * wheelCirc);
-      Serial.println("m ");
-      
-      //running = 0;
-      end_time = micros();
-      Serial.print(end_time);
-      Serial.print(" - ");
-      Serial.print(start_time);
-      Serial.print(" = ");
-      Serial.print(end_time-start_time);
-      Serial.println("us");
-
-      Serial.print("Average Speed (L R): ");
-      Serial.print(speedTotalL/counter1);
-      Serial.print(" : ");
-      Serial.println(speedTotalR/counter1);*/
-      //delay(2000);
-    //}
-  }else{
+  }
+  else
+  {
     brake(motorL, motorR);
-    //motorL.drive(100);
     if(Lfired){
-      //Serial.print(wheelSpeedL);
-      //Serial.print("\t");
-      //Serial.println(wheelSpeedR);
       Lfired = 0;
-    }//*/
+    }
   }
 }
