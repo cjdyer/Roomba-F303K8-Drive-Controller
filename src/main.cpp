@@ -404,18 +404,34 @@ void printBin(uint16_t input){
   }
 }
 
+int stall = 300;
+
 void loop(){
   if(running == 1){
     pidLeft.Compute();
     if(iter > 0)
     {
-      iter += iter_coeff;
-      motorL_PID.speedDesired = map(iter, 0, 250, 0, 20);
+      
+      if(iter == 250){
+        if(stall-- > 0){
+          Serial.println("wait");
+        }else{
+          iter--;
+          iter_coeff = -1;
+        }
+        
+      }else{
+        if(tachoL.numReadings % 2 == 0){
+          iter += iter_coeff;
+        }
+      }
+      //motorR.drive(150);
+      //motorL.drive(150);
+      
       motorL.drive(iter);
       motorR.drive(iter);
-      if(iter == 255){
-        iter_coeff = -1;
-      }
+      //motorL_PID.speedDesired = map(iter, 0, 250, 0, 20);
+      
       delay(20);    
     }
     else
@@ -539,11 +555,11 @@ void loop(){
     // This is because disabling this section would make the loop run faster.
     Serial.print(iter);
     Serial.print("\t");
-    Serial.print(tachoL.RPM);
-    Serial.print("\t");
+    //Serial.print(tachoL.RPM);
+    //Serial.print("\t");
+    //Serial.print(tachoR.RPM);
+    //Serial.print("\t");
     Serial.print(tachoL.average); // Tachometer
-    Serial.print("\t");
-    Serial.print(tachoR.RPM);
     Serial.print("\t");
     Serial.println(tachoR.average); // Tachometer
   }
