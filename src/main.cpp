@@ -9,7 +9,7 @@
 #endif
 
 /* Define Motor Driver Pins */
-#define AIN1 A5
+#define AIN1 3
 #define BIN1 7
 #define AIN2 4
 #define BIN2 8
@@ -410,24 +410,18 @@ void loop(){
     if(iter > 0)
     {
       
-      if(iter == 72){
+      if(iter == 250){
         if(stall-- > 0){
         }else{
           iter--;
-          iter_coeff = -1;
+          iter_coeff = -2;
         }
         
       }else{
-        if(tachoL.numReadings % 2 == 0){
-          iter += iter_coeff;
-        }
+        iter += iter_coeff;
       }
-      //motorR.drive(150);
-      //motorL.drive(150);
-      
       motorR.drive(iter);
       motorL.drive(iter);
-      
       //motorL_PID.speedDesired = map(iter, 0, 250, 0, 20);
       
       delay(20);    
@@ -546,11 +540,9 @@ void loop(){
     }
     
     // Calculate the average:
-    tachoR.average = tachoR.total / tachoR.numReadings;  // The average value it's the smoothed result.
+    tachoR.average = tachoR.total / tachoR.numReadings;  // The average value is the smoothed result.
 //*/
-    // Print information on the serial monitor:
-    // Comment this section if you have a display and you don't need to monitor the values on the serial monitor.
-    // This is because disabling this section would make the loop run faster.
+    // Print information on the serial monitor
     Serial.print(iter);
     Serial.print("\t");
     //Serial.print(tachoL.PeriodAverage);
