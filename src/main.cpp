@@ -404,7 +404,7 @@ void printBin(uint16_t input){
   }
 }
 
-int stall = 300;
+int stall = 100;
 
 void loop(){
   if(running == 1){
@@ -428,8 +428,9 @@ void loop(){
       //motorR.drive(150);
       //motorL.drive(150);
       
+      //motorR.drive(iter);
       motorL.drive(iter);
-      motorR.drive(iter);
+      
       //motorL_PID.speedDesired = map(iter, 0, 250, 0, 20);
       
       delay(20);    
@@ -494,7 +495,6 @@ void loop(){
 
     // Calculate the average:
     tachoL.average = tachoL.total / tachoL.numReadings;  // The average value it's the smoothed result.
-
 
 
     // The following is going to store the two values that might change in the middle of the cycle.
