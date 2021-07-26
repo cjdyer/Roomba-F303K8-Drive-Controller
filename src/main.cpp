@@ -77,14 +77,11 @@ const int offsetB = 1;
 Motor motorL = Motor(BIN1, BIN2, PWMB, offsetB, STBY);
 Motor motorR = Motor(AIN1, AIN2, PWMA, offsetA, STBY);
 
-
 //******************************//
 //******* PID SETUP ************//
 //******************************//
-
 PID pidLeft(&motorL_PID.speed, &motorL_PID.speedPWM, &motorL_PID.speedDesired, motorL_PID.kp, motorL_PID.ki, motorL_PID.kd, DIRECT);
 PID pidRight(&motorR_PID.speed, &motorR_PID.speedPWM, &motorR_PID.speedDesired, motorR_PID.kp, motorR_PID.ki, motorR_PID.kd, DIRECT);
-
 
 //******************************//
 //******* TIMER SETUP **********//
@@ -108,6 +105,7 @@ bool speedCheck = 0; // Timer speed calculator flag
 int iter        = 1; // Loop counter
 int iter_coeff  = 1;
 
+int counter_temp = 0;
 
 //******************************//
 //******* TIMER SETUP **********//
@@ -225,13 +223,13 @@ void encoderLeft_callback(void){
     tachoL.PulseCounter   = 1;  // Reset the counter to start over. The reset value is 1 because its the minimum setting allowed (1 reading).
     tachoL.PeriodSum      = tachoL.PeriodBetweenPulses;  // Reset PeriodSum to start a new averaging operation.
 
-    int RemapedAmountOfReadings = map(tachoL.PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
+    int RemapedAmountOfReadingsL = map(tachoL.PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
                                 // 1st value is what are we going to remap. In this case is the PeriodBetweenPulses.
                                 // 2nd value is the period value when we are going to have only 1 reading. The higher it is, the lower RPM has to be to reach 1 reading.
                                 // 3rd value is the period value when we are going to have 10 readings. The higher it is, the lower RPM has to be to reach 10 readings.
                                 // 4th and 5th values are the amount of readings range.
-    RemapedAmountOfReadings = constrain(RemapedAmountOfReadings, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
-    tachoL.AmountOfReadings = RemapedAmountOfReadings;  // Set amount of readings as the remaped value.
+    RemapedAmountOfReadingsL = constrain(RemapedAmountOfReadingsL, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
+    tachoL.AmountOfReadings = RemapedAmountOfReadingsL;  // Set amount of readings as the remaped value.
   }
   else
   {
@@ -251,7 +249,7 @@ void encoderRight_callback(void){
     wheelSpeedDistanceR += QEM[ROld * 4 + RNew];
     Rfired = 1;
   }*/
-
+  counter_temp++;
   tachoR.PeriodBetweenPulses   = micros() - tachoR.LastTimeWeMeasured;
   tachoR.LastTimeWeMeasured    = micros();
   
@@ -261,13 +259,13 @@ void encoderRight_callback(void){
     tachoR.PulseCounter   = 1;  // Reset the counter to start over. The reset value is 1 because its the minimum setting allowed (1 reading).
     tachoR.PeriodSum      = tachoR.PeriodBetweenPulses;  // Reset PeriodSum to start a new averaging operation.
 
-    int RemapedAmountOfReadings = map(tachoR.PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
+    int RemapedAmountOfReadingsL = map(tachoR.PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
                                 // 1st value is what are we going to remap. In this case is the PeriodBetweenPulses.
                                 // 2nd value is the period value when we are going to have only 1 reading. The higher it is, the lower RPM has to be to reach 1 reading.
                                 // 3rd value is the period value when we are going to have 10 readings. The higher it is, the lower RPM has to be to reach 10 readings.
                                 // 4th and 5th values are the amount of readings range.
-    RemapedAmountOfReadings = constrain(RemapedAmountOfReadings, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
-    tachoR.AmountOfReadings = RemapedAmountOfReadings;  // Set amount of readings as the remaped value.
+    RemapedAmountOfReadingsL = constrain(RemapedAmountOfReadingsL, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
+    tachoR.AmountOfReadings = RemapedAmountOfReadingsL;  // Set amount of readings as the remaped value.
   }
   else
   {
@@ -412,9 +410,8 @@ void loop(){
     if(iter > 0)
     {
       
-      if(iter == 250){
+      if(iter == 72){
         if(stall-- > 0){
-          Serial.println("wait");
         }else{
           iter--;
           iter_coeff = -1;
@@ -428,7 +425,7 @@ void loop(){
       //motorR.drive(150);
       //motorL.drive(150);
       
-      //motorR.drive(iter);
+      motorR.drive(iter);
       motorL.drive(iter);
       
       //motorL_PID.speedDesired = map(iter, 0, 250, 0, 20);
@@ -443,6 +440,7 @@ void loop(){
       Rrun = 0;
     }
 
+//  /*
     // The following is going to store the two values that might change in the middle of the cycle.
     // We are going to do math and functions with those values and they can create glitches if they change in the
     // middle of the cycle.
@@ -549,19 +547,20 @@ void loop(){
     
     // Calculate the average:
     tachoR.average = tachoR.total / tachoR.numReadings;  // The average value it's the smoothed result.
-
+//*/
     // Print information on the serial monitor:
     // Comment this section if you have a display and you don't need to monitor the values on the serial monitor.
     // This is because disabling this section would make the loop run faster.
     Serial.print(iter);
     Serial.print("\t");
-    //Serial.print(tachoL.RPM);
+    //Serial.print(tachoL.PeriodAverage);
     //Serial.print("\t");
-    //Serial.print(tachoR.RPM);
+    //Serial.print(tachoR.PeriodAverage);
     //Serial.print("\t");
     Serial.print(tachoL.average); // Tachometer
     Serial.print("\t");
-    Serial.println(tachoR.average); // Tachometer
+    Serial.print(tachoR.average); // Tachometer
+    Serial.println();
   }
   else
   {
