@@ -2,6 +2,7 @@
 #include <SparkFun_TB6612.h>
 #include <ICM_20948.h> // Sparkfun ICM_20948 IMU module
 #include <PID_v1.h>
+#include "motorClass.h"
 
 // Hardware Timer check
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
@@ -122,6 +123,9 @@ int RNew = 0; // New encoder value right motor
 unsigned long RPML = 0;
 unsigned long RPMR = 0;
 
+
+
+
 //******************************//
 //**** TACHOMETER SETUP ********//
 //******************************//
@@ -165,6 +169,9 @@ struct tacho
   unsigned long average;  // The RPM value after applying the smoothing.
 } tachoL, tachoR;
 
+tachoWheel tachoR_o;
+tachoWheel tachoL_o;
+
 // Speed Calc Callback
 void speedCalc_callback(void){
   if(motorL_PID.encoderPos > 0)
@@ -205,76 +212,9 @@ void speedCalc_callback(void){
   //Serial.println("tick"); CAN'T USE SERIAL PRINT IN STM32 BOARDS IN INTERRUPTS
 }
 
-// Left Hall encoder. Called once for each sensor on pin-change (quadrature)
-void encoderLeft_callback(void){
-  /*if(Lrun){
-    LOld = LNew;
-    // Access the Digital Input Register directly - MUCH faster than digitalRead()
-    LNew = ((GPIOA->IDR >> 0) & 1) * 2 + ((GPIOA->IDR >> 1) & 1); // Convert binary input to decimal value // (PINC & 0b0001) gets the value of bit zero in port C (A0), ((PINC & 0b0010) >> 1) gets just the value of A1
-    encoderPosL += QEM[LOld * 4 + LNew];
-    wheelSpeedDistanceL += QEM[LOld * 4 + LNew];
-    Lfired = 1; 
-  }*/
-  
-  tachoL.PeriodBetweenPulses   = micros() - tachoL.LastTimeWeMeasured;
-  tachoL.LastTimeWeMeasured    = micros();
-  
-  if(tachoL.PulseCounter >= tachoL.AmountOfReadings)  // If counter for amount of readings reach the set limit:
-  {
-    tachoL.PeriodAverage  = tachoL.PeriodSum / tachoL.AmountOfReadings;
-    tachoL.PulseCounter   = 1;  // Reset the counter to start over. The reset value is 1 because its the minimum setting allowed (1 reading).
-    tachoL.PeriodSum      = tachoL.PeriodBetweenPulses;  // Reset PeriodSum to start a new averaging operation.
-
-    int RemapedAmountOfReadingsL = map(tachoL.PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
-                                // 1st value is what are we going to remap. In this case is the PeriodBetweenPulses.
-                                // 2nd value is the period value when we are going to have only 1 reading. The higher it is, the lower RPM has to be to reach 1 reading.
-                                // 3rd value is the period value when we are going to have 10 readings. The higher it is, the lower RPM has to be to reach 10 readings.
-                                // 4th and 5th values are the amount of readings range.
-    RemapedAmountOfReadingsL = constrain(RemapedAmountOfReadingsL, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
-    tachoL.AmountOfReadings = RemapedAmountOfReadingsL;  // Set amount of readings as the remaped value.
-  }
-  else
-  {
-    tachoL.PulseCounter++;  // Increase the counter for amount of readings by 1.
-    tachoL.PeriodSum = tachoL.PeriodSum + tachoL.PeriodBetweenPulses;  // Add the periods so later we can average.
-  }
-} // end encoderLeft_callback
-
-// Right Hall encoder. Called once for each sensor on pin-change (quadrature)
-void encoderRight_callback(void){
-  /*if(Rrun){
-    ROld = RNew;
-    // Access the Digital Input Register directly - MUCH faster than digitalRead()
-    // encoderRA = 4th bit of GPIO port A, encoderRB = 5th bit
-    RNew = ((GPIOA->IDR >> 3) & 1) * 2 + ((GPIOA->IDR >> 4) & 1); // Convert binary input to decimal value // (PINC & 0b0001) gets the value of bit zero in port C (A0), ((PINC & 0b0010) >> 1) gets just the value of A1
-    encoderPosR += QEM[ROld * 4 + RNew];
-    wheelSpeedDistanceR += QEM[ROld * 4 + RNew];
-    Rfired = 1;
-  }*/
-  counter_temp++;
-  tachoR.PeriodBetweenPulses   = micros() - tachoR.LastTimeWeMeasured;
-  tachoR.LastTimeWeMeasured    = micros();
-  
-  if(tachoR.PulseCounter >= tachoR.AmountOfReadings)  // If counter for amount of readings reach the set limit:
-  {
-    tachoR.PeriodAverage  = tachoR.PeriodSum / tachoR.AmountOfReadings;
-    tachoR.PulseCounter   = 1;  // Reset the counter to start over. The reset value is 1 because its the minimum setting allowed (1 reading).
-    tachoR.PeriodSum      = tachoR.PeriodBetweenPulses;  // Reset PeriodSum to start a new averaging operation.
-
-    int RemapedAmountOfReadingsL = map(tachoR.PeriodBetweenPulses, 40000, 5000, 1, 10);  // Remap the period range to the reading range.
-                                // 1st value is what are we going to remap. In this case is the PeriodBetweenPulses.
-                                // 2nd value is the period value when we are going to have only 1 reading. The higher it is, the lower RPM has to be to reach 1 reading.
-                                // 3rd value is the period value when we are going to have 10 readings. The higher it is, the lower RPM has to be to reach 10 readings.
-                                // 4th and 5th values are the amount of readings range.
-    RemapedAmountOfReadingsL = constrain(RemapedAmountOfReadingsL, 1, 10);  // Constrain the value so it doesn't go below or above the limits.
-    tachoR.AmountOfReadings = RemapedAmountOfReadingsL;  // Set amount of readings as the remaped value.
-  }
-  else
-  {
-    tachoR.PulseCounter++;  // Increase the counter for amount of readings by 1.
-    tachoR.PeriodSum = tachoR.PeriodSum + tachoR.PeriodBetweenPulses;  // Add the periods so later we can average.
-  }
-}
+// Hall encoder ISRs. Called once for each sensor on pin-change (quadrature)
+void encoderLeft_callback(void) { tachoL_o.encoderTick(); }
+void encoderRight_callback(void){ tachoR_o.encoderTick(); }
 
 void printFormattedFloat(float val, uint8_t leading, uint8_t decimals){
   float aval = abs(val);
@@ -338,7 +278,7 @@ void printScaledAGMT(ICM_20948_SPI *sensor){
 void setup(){
   Serial.begin(115200);
   while (!Serial){};
-  //pinMode(LED_BUILTIN, OUTPUT);
+  
   // Configure Encoder Pins
   pinMode (encoderLA, INPUT);
   pinMode (encoderLB, INPUT);
@@ -404,59 +344,6 @@ void printBin(uint16_t input){
   }
 }
 
-double calcSpeed(tacho tachoWheel){
-  // The following is going to store the two values that might change in the middle of the cycle.
-  // We are going to do math and functions with those values and they can create glitches if they change in the
-  // middle of the cycle.
-  tachoWheel.LastTimeCycleMeasure = tachoWheel.LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
-  tachoWheel.CurrentMicros = micros();  // Store the micros() in a variable.
-
-  // CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
-  // I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
-  // LastTimeCycleMeasure I set it as the CurrentMicros.
-  // The need of fixing this is that we later use this information to see if pulses stopped.
-  if(tachoWheel.CurrentMicros < tachoWheel.LastTimeCycleMeasure){
-    tachoWheel.LastTimeCycleMeasure = tachoWheel.CurrentMicros;
-  }
-
-  // Calculate the frequency:
-  tachoWheel.FrequencyRaw = 10000000000 / tachoWheel.PeriodAverage;  // Calculate the frequency using the period between pulses.
-
-  // Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
-  if(tachoWheel.PeriodBetweenPulses > tachoWheel.ZeroTimeout          - tachoWheel.ZeroDebouncingExtra || 
-      tachoWheel.CurrentMicros       - tachoWheel.LastTimeCycleMeasure > tachoWheel.ZeroTimeout         - tachoWheel.ZeroDebouncingExtra){
-    // If the pulses are too far apart that we reached the timeout for zero:
-    tachoWheel.FrequencyRaw = 0;  // Set frequency as 0.
-    tachoWheel.ZeroDebouncingExtra = 2000;  // Change the threshold a little so it doesn't bounce.
-
-  } else {
-    tachoWheel.ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
-  }
-
-  tachoWheel.FrequencyReal = tachoWheel.FrequencyRaw / 10000;  // Get frequency without decimals.
-                                    // This is not used to calculate RPM but we remove the decimals just in case
-                                    // you want to print it.
-
-  // Calculate the RPM:
-  tachoWheel.RPM = tachoWheel.FrequencyRaw / tachoWheel.PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
-                                    // 60 seconds to get minutes.
-  tachoWheel.RPM = tachoWheel.RPM / 10000;  // Remove the decimals.
-
-  // Smoothing RPM:
-  tachoWheel.total = tachoWheel.total - tachoWheel.readings[tachoWheel.readIndex];  // Advance to the next position in the array.
-  tachoWheel.readings[tachoWheel.readIndex] = tachoWheel.RPM;            // Takes the value that we are going to smooth.
-  tachoWheel.total = tachoWheel.total + tachoWheel.readings[tachoWheel.readIndex];  // Add the reading to the total.
-  tachoWheel.readIndex = tachoWheel.readIndex + 1;            // Advance to the next position in the array.
-
-  if(tachoWheel.readIndex >= tachoWheel.numReadings){ // If we're at the end of the array:
-    tachoWheel.readIndex = 0;  // Reset array index.
-  }
-
-  // Calculate the average:
-  tachoWheel.average = tachoWheel.total / tachoWheel.numReadings;  // The average value it's the smoothed result.
-  return tachoWheel.average;
-}
-
 int stall = 25;
 
 void loop(){
@@ -489,131 +376,15 @@ void loop(){
       Rrun = 0;
     }
 
-  /*
-    // The following is going to store the two values that might change in the middle of the cycle.
-    // We are going to do math and functions with those values and they can create glitches if they change in the
-    // middle of the cycle.
-    tachoL.LastTimeCycleMeasure = tachoL.LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
-    tachoL.CurrentMicros = micros();  // Store the micros() in a variable.
-
-    // CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
-    // I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
-    // LastTimeCycleMeasure I set it as the CurrentMicros.
-    // The need of fixing this is that we later use this information to see if pulses stopped.
-    if(tachoL.CurrentMicros < tachoL.LastTimeCycleMeasure)
-    {
-      tachoL.LastTimeCycleMeasure = tachoL.CurrentMicros;
-    }
-
-    // Calculate the frequency:
-    tachoL.FrequencyRaw = 10000000000 / tachoL.PeriodAverage;  // Calculate the frequency using the period between pulses.
-
-    // Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
-    if( tachoL.PeriodBetweenPulses > tachoL.ZeroTimeout          - tachoL.ZeroDebouncingExtra || 
-        tachoL.CurrentMicros       - tachoL.LastTimeCycleMeasure > tachoL.ZeroTimeout         - tachoL.ZeroDebouncingExtra)
-    {  // If the pulses are too far apart that we reached the timeout for zero:
-      tachoL.FrequencyRaw = 0;  // Set frequency as 0.
-      tachoL.ZeroDebouncingExtra = 2000;  // Change the threshold a little so it doesn't bounce.
-    }
-    else
-    {
-      tachoL.ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
-    }
-
-    tachoL.FrequencyReal = tachoL.FrequencyRaw / 10000;  // Get frequency without decimals.
-                                        // This is not used to calculate RPM but we remove the decimals just in case
-                                        // you want to print it.
-
-    // Calculate the RPM:
-    tachoL.RPM = tachoL.FrequencyRaw / tachoL.PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
-                                                // 60 seconds to get minutes.
-    tachoL.RPM = tachoL.RPM / 10000;  // Remove the decimals.
-
-    // Smoothing RPM:
-    tachoL.total = tachoL.total - tachoL.readings[tachoL.readIndex];  // Advance to the next position in the array.
-    tachoL.readings[tachoL.readIndex] = tachoL.RPM;            // Takes the value that we are going to smooth.
-    tachoL.total = tachoL.total + tachoL.readings[tachoL.readIndex];  // Add the reading to the total.
-    tachoL.readIndex = tachoL.readIndex + 1;            // Advance to the next position in the array.
-
-    if (tachoL.readIndex >= tachoL.numReadings)  // If we're at the end of the array:
-    {
-      tachoL.readIndex = 0;  // Reset array index.
-    }
-
-    // Calculate the average:
-    tachoL.average = tachoL.total / tachoL.numReadings;  // The average value it's the smoothed result.
-
-    /*
-    // The following is going to store the two values that might change in the middle of the cycle.
-    // We are going to do math and functions with those values and they can create glitches if they change in the
-    // middle of the cycle.
-    tachoR.LastTimeCycleMeasure = tachoR.LastTimeWeMeasured;  // Store the LastTimeWeMeasured in a variable.
-    tachoR.CurrentMicros = micros();  // Store the micros() in a variable.
-
-    // CurrentMicros should always be higher than LastTimeWeMeasured, but in rare occasions that's not true.
-    // I'm not sure why this happens, but my solution is to compare both and if CurrentMicros is lower than
-    // LastTimeCycleMeasure I set it as the CurrentMicros.
-    // The need of fixing this is that we later use this information to see if pulses stopped.
-    if(tachoR.CurrentMicros < tachoR.LastTimeCycleMeasure)
-    {
-      tachoR.LastTimeCycleMeasure = tachoR.CurrentMicros;
-    }
-
-    // Calculate the frequency:
-    tachoR.FrequencyRaw = 10000000000 / tachoR.PeriodAverage;  // Calculate the frequency using the period between pulses.
-
-    // Detect if pulses stopped or frequency is too low, so we can show 0 Frequency:
-    if(tachoR.PeriodBetweenPulses > tachoR.ZeroTimeout          - tachoR.ZeroDebouncingExtra || 
-        tachoR.CurrentMicros       - tachoR.LastTimeCycleMeasure > tachoR.ZeroTimeout         - tachoR.ZeroDebouncingExtra)
-    {  // If the pulses are too far apart that we reached the timeout for zero:
-      tachoR.FrequencyRaw = 0;  // Set frequency as 0.
-      tachoR.ZeroDebouncingExtra = 2000;  // Change the threshold a little so it doesn't bounce.
-    }
-    else
-    {
-      tachoR.ZeroDebouncingExtra = 0;  // Reset the threshold to the normal value so it doesn't bounce.
-    }
-
-    tachoR.FrequencyReal = tachoR.FrequencyRaw / 10000;  // Get frequency without decimals.
-                                        // This is not used to calculate RPM but we remove the decimals just in case
-                                        // you want to print it.
-
-    // Calculate the RPM:
-    tachoR.RPM = tachoR.FrequencyRaw / tachoR.PulsesPerRevolution * 60;  // Frequency divided by amount of pulses per revolution multiply by
-                                                // 60 seconds to get minutes.
-    tachoR.RPM = tachoR.RPM / 10000;  // Remove the decimals.
-
-    // Smoothing RPM:
-    tachoR.total = tachoR.total - tachoR.readings[tachoR.readIndex];  // Advance to the next position in the array.
-    tachoR.readings[tachoR.readIndex] = tachoR.RPM;            // Takes the value that we are going to smooth.
-    tachoR.total = tachoR.total + tachoR.readings[tachoR.readIndex];  // Add the reading to the total.
-    tachoR.readIndex = tachoR.readIndex + 1;            // Advance to the next position in the array.
-
-    if(tachoR.readIndex >= tachoR.numReadings){  // If we're at the end of the array:
-      tachoR.readIndex = 0;  // Reset array index.
-    }
-    
-    // Calculate the average:
-    tachoR.average = tachoR.total / tachoR.numReadings;  // The average value is the smoothed result.
-    //*/
-
-    RPML = calcSpeed(tachoL);
-    RPMR = calcSpeed(tachoL);
+    RPML = tachoR_o.getVelocity();
+    RPMR = tachoL_o.getVelocity();
 
     // Print information on the serial monitor
     Serial.print(iter);
     Serial.print("\t");
-    //Serial.print(tachoL.PeriodAverage);
-    //Serial.print("\t");
-    //Serial.print(tachoR.PeriodAverage);
-    //Serial.print("\t");
     Serial.print(RPML); // Tachometer
     Serial.print("\t");
     Serial.print(RPMR); // Tachometer
-    //Serial.print("\t");
-    //Serial.print(tachoL.average); // Tachometer
-    //Serial.print("\t");
-    //Serial.print(tachoR.average); // Tachometer
     Serial.println();
   
   }else{
