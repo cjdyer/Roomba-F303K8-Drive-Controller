@@ -3,8 +3,10 @@
 class tachoWheel{
     public:
         tachoWheel();
-        unsigned long getVelocity();
-        void encoderTick();
+        void            calcVelocity();
+        void            encoderTick();
+        
+        unsigned long   getVelocity(){return average;}
 
         const uint16_t          PulsesPerRevolution = 1633; // Encoder pulses for 1 full rotation (Quadrature)
         const unsigned long     ZeroTimeout = 100000;       // If the period between pulses is too high, or even if the pulses stopped, then we would get stuck showing the
@@ -42,5 +44,4 @@ class tachoWheel{
         unsigned long readIndex;  // The index of the current reading.
         unsigned long total;  // The running total.
         unsigned long average;  // The RPM value after applying the smoothing.
-    
 };
