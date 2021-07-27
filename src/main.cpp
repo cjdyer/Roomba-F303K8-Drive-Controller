@@ -58,10 +58,10 @@ struct motorPID {
   double speed                 = 0; // Calculated wheel speed in RPM
   double speedDesired          = 0; // PID Set Point
   double speedPWM              = 0; // RPM
-  double kp                    = 2.0; // Proportional coefficient
-  double ki                    = 5.0; // Integral coefficient
-  double kd                    = 1.0; // Derivative coefficient
-  
+  double kp                    = 0; //0.02; // Proportional coefficient
+  double ki                    = 0; //16.0; // Integral coefficient
+  double kd                    = 0; //0.01; // Derivative coefficient
+
   float  lastKnownPos          = 0; // Last Known Position
   float  ticks_per_millisecond = 0;
   
@@ -81,14 +81,20 @@ Motor motorR = Motor(AIN1, AIN2, PWMA, offsetA, STBY);
 //******************************//
 //******* PID SETUP ************//
 //******************************//
-PID pidLeft(&motorL_PID.speed, &motorL_PID.speedPWM, &motorL_PID.speedDesired, motorL_PID.kp, motorL_PID.ki, motorL_PID.kd, DIRECT);
-PID pidRight(&motorR_PID.speed, &motorR_PID.speedPWM, &motorR_PID.speedDesired, motorR_PID.kp, motorR_PID.ki, motorR_PID.kd, DIRECT);
+PID pidLeft (&motorL_PID.speed, &motorL_PID.speedPWM, &motorL_PID.speedDesired, motorL_PID.kp, motorL_PID.ki, motorL_PID.kd, P_ON_M, DIRECT);
+PID pidRight(&motorR_PID.speed, &motorR_PID.speedPWM, &motorR_PID.speedDesired, motorR_PID.kp, motorR_PID.ki, motorR_PID.kd, P_ON_M, DIRECT);
 
 //******************************//
 //******* TIMER SETUP **********//
 //******************************//
 TIM_TypeDef *Instance1 = TIM2;
 HardwareTimer *Timer1 = new HardwareTimer(Instance1);
+
+//******************************//
+//**** TACHOMETER SETUP ********//
+//******************************//
+tachoWheel tachoR_o;
+tachoWheel tachoL_o;
 
 //******************************//
 //******* EVENT FLAGS **********//
@@ -106,7 +112,7 @@ bool speedCheck = 0; // Timer speed calculator flag
 int iter        = 1; // Loop counter
 int iter_coeff  = 1;
 
-int counter_temp = 0;
+int counter_tmp = 0; // Encoder debugging
 
 //******************************//
 //******* TIMER SETUP **********//
@@ -114,102 +120,20 @@ int counter_temp = 0;
 //  2s shouldn't ever appear
 //  Sauce: https://cdn.sparkfun.com/datasheets/Robotics/How%20to%20use%20a%20quadrature%20encoder.pdf
 //******************************//
-int QEM [16] = {0,-1,1,2,1,0,2,-1,-1,2,0,1,2,1,-1,0}; 
+int QEM [16] = {0,-1,1,2,1,0,2,-1,-1,2,0,1,2,1,-1,0};
 int LOld = 0; // Previous encoder value left motor
 int ROld = 0; // Previous encoder value right motor
 int LNew = 0; // New encoder value left motor
 int RNew = 0; // New encoder value right motor
 
-unsigned long RPML = 0;
-unsigned long RPMR = 0;
-
-
-
-
-//******************************//
-//**** TACHOMETER SETUP ********//
-//******************************//
-struct tacho
-{
-  const uint16_t          PulsesPerRevolution = 1633; // Encoder pulses for 1 full rotation (Quadrature)
-  const unsigned long     ZeroTimeout = 100000;       // If the period between pulses is too high, or even if the pulses stopped, then we would get stuck showing the
-                                                      // last value instead of a 0. Because of this we are going to set a limit for the maximum period allowed.
-                                                      // If the period is above this value, the RPM will show as 0.
-                                                      // The higher the set value, the longer lag/delay will have to sense that pulses stopped, but it will allow readings
-                                                      // at very low RPM.
-                                                      // Setting a low value is going to allow the detection of stop situations faster, but it will prevent having low RPM readings.
-                                                      // The unit is in microseconds.
-  const byte              numReadings = 10;            // Number of samples for smoothing. The higher, the more smoothing, but it's going to
-                                                      // react slower to changes. 1 = no smoothing. Default: 2.
-  volatile unsigned long  LastTimeWeMeasured;         // Time at the last pulse
-  volatile unsigned long  PeriodBetweenPulses = ZeroTimeout+1000; // Stores the period between pulses in microseconds.
-                                                                  // It has a big number so it doesn't start with 0 which would be interpreted as a high frequency.
-  volatile unsigned long  PeriodAverage = ZeroTimeout+1000;       // Stores the period between pulses in microseconds in total, if we are taking multiple pulses.
-
-  unsigned long   CurrentMicros = micros(); // Micros at the current cycle
-  unsigned long   FrequencyRaw;             // Calculated frequency, based on the period. This has a lot of extra decimals without the decimal point.
-  unsigned long   FrequencyReal;            // Frequency without decimals.
-  unsigned long   PeriodSum;                // Stores the summation of all the periods to do the average.
-  unsigned long   RPM;                      // Raw RPM without any processing.
-  unsigned long   LastTimeCycleMeasure = LastTimeWeMeasured; // Stores the last time we measure a pulse in that cycle.
-                                      // We need a variable with a value that is not going to be affected by the interrupt
-                                      // because we are going to do math and functions that are going to mess up if the values
-                                      // changes in the middle of the cycle.
-  unsigned int    PulseCounter = 1;         // Counts the amount of pulse readings we took so we can average multiple pulses before calculating the period.
-  unsigned int    AmountOfReadings = 1;     // Stores the last time we measure a pulse in that cycle.
-                                            // We need a variable with a value that is not going to be affected by the interrupt
-                                            // because we are going to do math and functions that are going to mess up if the values
-                                            // changes in the middle of the cycle.
-  unsigned int    ZeroDebouncingExtra;      // Stores the extra value added to the ZeroTimeout to debounce it.
-
-  // Variables for smoothing tachometer:
-  unsigned long readings[10];  // The input. // [numReadings]
-  unsigned long readIndex;  // The index of the current reading.
-  unsigned long total;  // The running total.
-  unsigned long average;  // The RPM value after applying the smoothing.
-} tachoL, tachoR;
-
-tachoWheel tachoR_o;
-tachoWheel tachoL_o;
 
 // Speed Calc Callback
 void speedCalc_callback(void){
-  if(motorL_PID.encoderPos > 0)
-    motorL_PID.speed = motorL_PID.encoderPos * rpm_coefficient; // RPM angular_vel = da/dt * 600 (convert to minutes)    //wheelSpeedL = 600 * (encoderPosL/fullRev)/0.01;
-  
-  if(motorR_PID.encoderPos > 0)
-    motorR_PID.speed = motorR_PID.encoderPos * rpm_coefficient; // RPM
-
-  motorL_PID.speedTotal += motorL_PID.speed;
-  motorR_PID.speedTotal += motorR_PID.speed;
-
-  motorL_PID.encoderPos = 0;
-  motorR_PID.encoderPos = 0;
-  
+  tachoL_o.calcVelocity();
+  tachoR_o.calcVelocity();
+  motorL_PID.speed = tachoL_o.getVelocity();
+  motorR_PID.speed = tachoR_o.getVelocity();
   speedCheck  = 1;
-
-/*
-  if(Lrun){
-    speedL_error = wheelSpeedL_desired - wheelSpeedL;
-    
-    // PID
-    speedL_pwm = speedL_error*kp + speedL_esum*ki + (speedL_error - speedL_error_pre)*kd;
-    speedL_error_pre = speedL_error;  //save last (previous) error
-    speedL_esum += speedL_error;      //sum of error
-    
-    if (speedL_esum >4000)  speedL_esum = 4000;
-    if (speedL_esum <-4000) speedL_esum = -4000;
-  
-  }else{
-    motorL.brake();
-    speedL_error = 0;
-    speedL_error_pre = 0;
-    speedL_esum = 0;
-    speedL_pwm = 0;
-  }
-*/
-
-  //Serial.println("tick"); CAN'T USE SERIAL PRINT IN STM32 BOARDS IN INTERRUPTS
 }
 
 // Hall encoder ISRs. Called once for each sensor on pin-change (quadrature)
@@ -297,10 +221,26 @@ void setup(){
   brake(motorL, motorR);
   Serial.println("Motor Brakes Applied");
 
-  delay(200);
+  delay(100);
   Serial.println("After Delay");
   motorL_PID.lastKnownPos = motorL_PID.encoderPos / stripLPI * 25.4;
   motorR_PID.lastKnownPos = motorR_PID.encoderPos / stripLPI * 25.4;
+
+  pidLeft.SetMode(AUTOMATIC); //start calculation.
+  pidLeft.SetOutputLimits(0,255);
+  pidLeft.SetSampleTime(20);
+  
+
+  pidRight.SetMode(AUTOMATIC); //start calculation.
+  pidRight.SetOutputLimits(0,255);
+  pidRight.SetSampleTime(10);
+
+  // P I D
+  pidLeft. SetTunings(0.8,  11.0, 0.1);
+  pidRight.SetTunings(0.05, 18.0, 0.01);
+
+  //pidLeft. SetTunings(9.451950723484504, 8.592682475895003, 0.09451950723484505);
+  //pidRight.SetTunings(0.02, 18.0, 0.01);
 
   //Serial.print("Initializing IMU... ");
   // Initialise IMU with SPI
@@ -328,7 +268,7 @@ void setup(){
   delay(500);
   noInterrupts();
       //Timer1->setOverflow(100000, MICROSEC_FORMAT);
-      Timer1->setOverflow(50, HERTZ_FORMAT);
+      Timer1->setOverflow(60, HERTZ_FORMAT);
       Timer1->attachInterrupt(speedCalc_callback);
   interrupts();
   Timer1->resume();//*/
@@ -344,15 +284,23 @@ void printBin(uint16_t input){
   }
 }
 
-int stall = 25;
+int stall = 50;
 
 void loop(){
   if(running == 1){
-    pidLeft.Compute();
-    if(iter > 0)
-    {
-      
-      if(iter == 250){
+    if(stall-- > 0){
+      Serial.print(0.001); // Tachometer
+      Serial.print("\t");
+      Serial.print(0); // Tachometer
+      Serial.print("\t");
+      Serial.println(0); // Tachometer
+      motorL_PID.speedDesired = 140;
+      motorR_PID.speedDesired = 140;
+      delay(30);
+    
+    }else if(iter++ < 500){
+    //}else if(iter > 0){
+      /*if(iter == 600){
         if(stall-- > 0){
         }else{
           iter--;
@@ -361,34 +309,48 @@ void loop(){
         
       }else{
         iter += iter_coeff;
-      }
-      motorR.drive(iter);
-      motorL.drive(iter);
-      //motorL_PID.speedDesired = map(iter, 0, 250, 0, 20);
+      }*/
       
-      delay(20);    
-    }
-    else
-    {
-      running = 0;
+      //motorL_PID.speedDesired = map(iter, 0, 600, 0, 140);
+      //motorR_PID.speedDesired = map(iter, 0, 600, 0, 140);
+
+      //*
+      switch(iter){
+        //case 200: motorL_PID.speedDesired = 100; motorR_PID.speedDesired = 100; break;
+        case 200: motorL_PID.speedDesired = 50;  motorR_PID.speedDesired = 50; break;
+        case 300: motorL_PID.speedDesired = 100;  motorR_PID.speedDesired = 100; break;
+        //case 800: motorL_PID.speedDesired = 40;  motorR_PID.speedDesired = 40; break;
+        default: break;
+      }//*/
+      
+      pidLeft.Compute();
+      pidRight.Compute();
+
+      motorL.drive(motorL_PID.speedPWM); // Output
+      motorR.drive(motorR_PID.speedPWM); // Output
+
+      // Print information on the serial monitor
+      Serial.print(motorL_PID.speedDesired); // Tachometer
+      Serial.print("\t");
+      Serial.print(motorL_PID.speed); // Tachometer
+      Serial.print("\t");
+      Serial.print(motorR_PID.speed); // Tachometer
+      Serial.print("\t");
+      Serial.println();
+      //motorL.drive(map(motorL_PID.speedPWM, 0, 130, 0, 250)); // Output
+      delay(30);
+
+    }else{
       Timer1->pause();
-      Lrun = 0;
-      Rrun = 0;
+      //running = 0;
+      motorR_PID.speedDesired = 0;
+      motorL_PID.speedDesired = 0;
+      motorL.drive(0); // Output
+      motorR.drive(0); // Output
     }
 
-    RPML = tachoR_o.getVelocity();
-    RPMR = tachoL_o.getVelocity();
-
-    // Print information on the serial monitor
-    Serial.print(iter);
-    Serial.print("\t");
-    Serial.print(RPML); // Tachometer
-    Serial.print("\t");
-    Serial.print(RPMR); // Tachometer
-    Serial.println();
-  
   }else{
-    brake(motorL, motorR);
+    //brake(motorL, motorR);
     if(Lfired){
       Lfired = 0;
     }
