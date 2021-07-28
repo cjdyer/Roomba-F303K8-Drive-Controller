@@ -339,14 +339,16 @@ void loop(){
       Serial.print("\t");
       Serial.print(motorR_PID.speed); // Tachometer
       Serial.print("\t");
-      //Serial.println();
+      Serial.println();
       //*/
       
+      /*
       if(myICM.dataReady()){
         myICM.getAGMT();         // The values are only updated when you call 'getAGMT'
                                  //    printRawAGMT( myICM.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
         printScaledAGMT(&myICM); // This function takes into account the scale settings from when the measurement was made to calculate the values with units
       }
+      //*
 
       //motorL.drive(map(motorL_PID.speedPWM, 0, 130, 0, 250)); // Output
       delay(30);
