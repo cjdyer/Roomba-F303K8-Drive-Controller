@@ -317,6 +317,7 @@ void loop(){
         pidLeft .Compute();
         pidRight.Compute();
         
+        // TODO NOT WORKING IN REVERSE
         motorL.drive(motorL_PID.speedPWM); // Output
         motorR.drive(motorR_PID.speedPWM); // Output
 
