@@ -57,7 +57,7 @@ struct motorPID {
   double speedError_pre        = 0; // Error 
   double speedErrorSum         = 0; // Sum of errors
   double speed                 = 0; // Calculated wheel speed in RPM
-  double speedDesired          = 0; // PID Set Point
+  double speedDesired          = 100; // PID Set Point
   double speedPWM              = 0; // RPM
   double kp                    = 0; //0.02; // Proportional coefficient
   double ki                    = 0; //16.0; // Integral coefficient
@@ -68,6 +68,9 @@ struct motorPID {
   
   long   wheelSpeedDistance    = 0; // RPM
 } motorL_PID, motorR_PID;
+
+enum sysModes {IDLE, TEST, ACTIVE, STOPPED};
+int sysMode = IDLE;
 
 //******************************//
 //******* MOTOR SETUP **********//
@@ -115,6 +118,8 @@ int iter_coeff  = 1;
 
 int counter_tmp = 0; // Encoder debugging
 
+bool firstChar  = 1;
+
 //******************************//
 //******* TIMER SETUP **********//
 //  Quadrature Encoder matrix
@@ -127,6 +132,9 @@ int ROld = 0; // Previous encoder value right motor
 int LNew = 0; // New encoder value left motor
 int RNew = 0; // New encoder value right motor
 
+String inputString = "";     // a String to hold incoming data
+bool stringComplete = false; // whether the string is complete
+char modeSelect = '0';
 
 // Speed Calc Callback
 void speedCalc_callback(void){
@@ -143,36 +151,30 @@ void encoderRight_callback(void){ tachoR_o.encoderTick(); }
 
 void printFormattedFloat(float val, uint8_t leading, uint8_t decimals){
   float aval = abs(val);
-  if (val < 0){
+  if (val < 0)
     Serial.print("-");
-
-  } else {
+  else
     Serial.print(" ");
-  }
-
+  
   for (uint8_t indi = 0; indi < leading; indi++){
     uint32_t tenpow = 0;
-    if (indi < (leading - 1)){
+    if (indi < (leading - 1))
       tenpow = 1;
-    }
     
-    for (uint8_t c = 0; c < (leading - 1 - indi); c++){
+    for(uint8_t c = 0; c < (leading - 1 - indi); c++)
       tenpow *= 10;
-    }
-
-    if (aval < tenpow){
+    
+    if (aval < tenpow)
       Serial.print("0");
-
-    } else {
+    else
       break;
-    }
   }
-  if (val < 0){
-    Serial.print(-val, decimals);
 
-  } else {
+  if (val < 0)
+    Serial.print(-val, decimals);
+  else
     Serial.print(val, decimals);
-  }
+
 }
 
 void printScaledAGMT(ICM_20948_SPI *sensor){
@@ -201,6 +203,9 @@ void printScaledAGMT(ICM_20948_SPI *sensor){
 
 void setup(){
   Serial.begin(115200);
+
+  inputString.reserve(200);
+
   while (!Serial){};
   
   // Configure Encoder Pins
@@ -285,19 +290,61 @@ void printBin(uint16_t input){
 
 int stall = 50;
 
+/*
+  SerialEvent occurs whenever a new data comes in the hardware serial RX. This
+  routine is run between each time loop() runs, so using delay inside loop can
+  delay response. Multiple bytes of data may be available.
+*/
+void serialEvent(){
+  while (Serial.available()){
+    // get the new byte:
+    char inChar = (char)Serial.read();
+    // add it to the inputString:
+    /*if(firstChar == 0){
+      modeSelect = inChar;
+      firstChar = 1;
+    }*/
+    
+    inputString += inChar;
+    // if the incoming character is a newline, set a flag so the main loop can do something about it:
+    if (inChar == '\n') {
+      stringComplete = true;
+      //firstChar = 1;
+    }
+  }
+}
+
 void loop(){
   if(running == 1){
-    if(stall-- > 0){
+    if(stringComplete){
+      modeSelect = inputString[0];
+      Serial.print(inputString[0]);
+      Serial.print(' ');
+      Serial.print(inputString);
+      if(modeSelect == 'S'){ // Speed
+        Serial.println(inputString);
+      
+      }else if(modeSelect == 'T'){ // Run Test
+
+      }else if(modeSelect == 'X'){
+        running = 0;
+      }
+      // clear the string:
+      inputString = "";
+      stringComplete = false;
+    }
+
+    //if(stall-- > 0){
       //Serial.print(0.001); // Tachometer
       //Serial.print("\t");
       //Serial.print(0); // Tachometer
       //Serial.print("\t");
       //Serial.println(0); // Tachometer
-      motorL_PID.speedDesired = 140;
-      motorR_PID.speedDesired = 140;
-      delay(30);
+      //motorL_PID.speedDesired = 140;
+      //motorR_PID.speedDesired = 140;
+      //delay(30);
     
-    }else if(iter++ < 800){
+    //}else if(iter++ < 800){
     //}else if(iter > 0){
       /*
       if(iter == 600){
@@ -315,24 +362,25 @@ void loop(){
       //motorL_PID.speedDesired = map(iter, 0, 600, 0, 140);
       //motorR_PID.speedDesired = map(iter, 0, 600, 0, 140);
 
-      //*
+      /*
       switch(iter){
         //case 200: motorL_PID.speedDesired = 100; motorR_PID.speedDesired = 100; break;
-        case 200: motorL_PID.speedDesired = 50;  motorR_PID.speedDesired = 50; break;
-        case 300: motorL_PID.speedDesired = 100;  motorR_PID.speedDesired = 100; break;
+          case 200: motorL_PID.speedDesired = 50;  motorR_PID.speedDesired = 50; break;
+          case 300: motorL_PID.speedDesired = 100; motorR_PID.speedDesired = 100; break;
         //case 800: motorL_PID.speedDesired = 40;  motorR_PID.speedDesired = 40; break;
         default: break;
       }
       //*/
       
       //*
-      pidLeft.Compute();
-      pidRight.Compute();
+      //pidLeft .Compute();
+      //pidRight.Compute();
 
-      motorL.drive(motorL_PID.speedPWM); // Output
-      motorR.drive(motorR_PID.speedPWM); // Output
+      //motorL.drive(motorL_PID.speedPWM); // Output
+      //motorR.drive(motorR_PID.speedPWM); // Output
 
       // Print information on the serial monitor
+      /*
       Serial.print(motorL_PID.speedDesired); // Tachometer
       Serial.print("\t");
       Serial.print(motorL_PID.speed); // Tachometer
