@@ -28,11 +28,12 @@
 #define stripLPI 150.0
 
 /* IMU definitions */
-#define SPI_PORT SPI  // Your desired SPI port.       Used only when "USE_SPI" is defined
+
+#define SPI_PORT SPI  // 13 // Your desired SPI port.       Used only when "USE_SPI" is defined
 #define CS_PIN 10     // Which pin you connect CS to. Used only when "USE_SPI" is defined
 
-#define WIRE_PORT Wire // Your desired Wire port.      Used when "USE_SPI" is not defined
-#define AD0_VAL 1      // The value of the last bit of the I2C address.                
+//#define WIRE_PORT Wire // Your desired Wire port.      Used when "USE_SPI" is not defined
+//#define AD0_VAL 1      // The value of the last bit of the I2C address.                
                        // On the SparkFun 9DoF IMU breakout the default is 1, and when 
                        // the ADR jumper is closed the value becomes 0
 
@@ -175,27 +176,26 @@ void printFormattedFloat(float val, uint8_t leading, uint8_t decimals){
 }
 
 void printScaledAGMT(ICM_20948_SPI *sensor){
-  Serial.print("Scaled. Acc (mg) [ ");
+  //Serial.print("Scaled. Acc (mg) [ ");
   printFormattedFloat(sensor->accX(), 5, 2);
-  Serial.print(", ");
+  Serial.print("\t");
   printFormattedFloat(sensor->accY(), 5, 2);
-  Serial.print(", ");
+  Serial.print("\t");
   printFormattedFloat(sensor->accZ(), 5, 2);
-  Serial.print(" ], Gyr (DPS) [ ");
+  Serial.print("\t");
   printFormattedFloat(sensor->gyrX(), 5, 2);
-  Serial.print(", ");
+  Serial.print("\t");
   printFormattedFloat(sensor->gyrY(), 5, 2);
-  Serial.print(", ");
+  Serial.print("\t");
   printFormattedFloat(sensor->gyrZ(), 5, 2);
-  Serial.print(" ], Mag (uT) [ ");
+  Serial.print("\t");
   printFormattedFloat(sensor->magX(), 5, 2);
-  Serial.print(", ");
+  Serial.print("\t");
   printFormattedFloat(sensor->magY(), 5, 2);
-  Serial.print(", ");
+  Serial.print("\t");
   printFormattedFloat(sensor->magZ(), 5, 2);
-  Serial.print(" ], Tmp (C) [ ");
+  Serial.print("\t");
   printFormattedFloat(sensor->temp(), 5, 2);
-  Serial.print(" ]");
   Serial.println();
 }
 
@@ -230,7 +230,6 @@ void setup(){
   pidLeft.SetOutputLimits(0,255);
   pidLeft.SetSampleTime(20);
   
-
   pidRight.SetMode(AUTOMATIC); //start calculation.
   pidRight.SetOutputLimits(0,255);
   pidRight.SetSampleTime(10);
@@ -245,7 +244,7 @@ void setup(){
   //Serial.print("Initializing IMU... ");
   // Initialise IMU with SPI
   
-  /*
+  //*
   myICM.begin(CS_PIN, SPI_PORT);
 
   bool initialized = false;
@@ -260,7 +259,7 @@ void setup(){
       initialized = true;
       Serial.print("Initialized");
     }
-  }*/
+  }//*/
 
   Serial.println("Activating Timer");
   // Configure Speed calculation interrupt with Timer1
@@ -289,18 +288,19 @@ int stall = 50;
 void loop(){
   if(running == 1){
     if(stall-- > 0){
-      Serial.print(0.001); // Tachometer
-      Serial.print("\t");
-      Serial.print(0); // Tachometer
-      Serial.print("\t");
-      Serial.println(0); // Tachometer
+      //Serial.print(0.001); // Tachometer
+      //Serial.print("\t");
+      //Serial.print(0); // Tachometer
+      //Serial.print("\t");
+      //Serial.println(0); // Tachometer
       motorL_PID.speedDesired = 140;
       motorR_PID.speedDesired = 140;
       delay(30);
     
-    }else if(iter++ < 500){
+    }else if(iter++ < 800){
     //}else if(iter > 0){
-      /*if(iter == 600){
+      /*
+      if(iter == 600){
         if(stall-- > 0){
         }else{
           iter--;
@@ -309,7 +309,8 @@ void loop(){
         
       }else{
         iter += iter_coeff;
-      }*/
+      }
+      //*/
       
       //motorL_PID.speedDesired = map(iter, 0, 600, 0, 140);
       //motorR_PID.speedDesired = map(iter, 0, 600, 0, 140);
@@ -321,8 +322,10 @@ void loop(){
         case 300: motorL_PID.speedDesired = 100;  motorR_PID.speedDesired = 100; break;
         //case 800: motorL_PID.speedDesired = 40;  motorR_PID.speedDesired = 40; break;
         default: break;
-      }//*/
+      }
+      //*/
       
+      //*
       pidLeft.Compute();
       pidRight.Compute();
 
@@ -336,10 +339,19 @@ void loop(){
       Serial.print("\t");
       Serial.print(motorR_PID.speed); // Tachometer
       Serial.print("\t");
-      Serial.println();
+      //Serial.println();
+      //*/
+      
+      if(myICM.dataReady()){
+        myICM.getAGMT();         // The values are only updated when you call 'getAGMT'
+                                 //    printRawAGMT( myICM.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
+        printScaledAGMT(&myICM); // This function takes into account the scale settings from when the measurement was made to calculate the values with units
+      }
+
       //motorL.drive(map(motorL_PID.speedPWM, 0, 130, 0, 250)); // Output
       delay(30);
 
+    //*
     }else{
       Timer1->pause();
       //running = 0;
@@ -348,6 +360,7 @@ void loop(){
       motorL.drive(0); // Output
       motorR.drive(0); // Output
     }
+    //*/
 
   }else{
     //brake(motorL, motorR);
