@@ -3,6 +3,9 @@
 #include <ICM_20948.h> // Sparkfun ICM_20948 IMU module
 #include <PID_v1.h>
 #include "motorClass.h"
+#include <string.h>
+
+using namespace std;
 
 // Hardware Timer check
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
@@ -69,7 +72,7 @@ struct motorPID {
   long   wheelSpeedDistance    = 0; // RPM
 } motorL_PID, motorR_PID;
 
-enum sysModes {IDLE, TEST, ACTIVE, STOPPED};
+enum sysModes {IDLE, TEST_IMU, TEST_DRIVE, TEST_DRIVE_SPEED, ACTIVE, STOPPED};
 int sysMode = IDLE;
 
 //******************************//
@@ -132,7 +135,7 @@ int ROld = 0; // Previous encoder value right motor
 int LNew = 0; // New encoder value left motor
 int RNew = 0; // New encoder value right motor
 
-String inputString = "";     // a String to hold incoming data
+char payload[100];     // a String to hold incoming data
 bool stringComplete = false; // whether the string is complete
 char modeSelect = '0';
 
@@ -204,8 +207,6 @@ void printScaledAGMT(ICM_20948_SPI *sensor){
 void setup(){
   Serial.begin(115200);
 
-  inputString.reserve(200);
-
   while (!Serial){};
   
   // Configure Encoder Pins
@@ -246,7 +247,7 @@ void setup(){
   //pidLeft. SetTunings(9.451950723484504, 8.592682475895003, 0.09451950723484505);
   //pidRight.SetTunings(0.02, 18.0, 0.01);
 
-  //Serial.print("Initializing IMU... ");
+  Serial.println("Initializing IMU... ");
   // Initialise IMU with SPI
   
   //*
@@ -262,7 +263,7 @@ void setup(){
       delay(500);
     } else {
       initialized = true;
-      Serial.print("Initialized");
+      Serial.println("Initialized");
     }
   }//*/
 
@@ -289,6 +290,7 @@ void printBin(uint16_t input){
 }
 
 int stall = 50;
+int idx = 0; // Index for serial reading
 
 /*
   SerialEvent occurs whenever a new data comes in the hardware serial RX. This
@@ -296,73 +298,119 @@ int stall = 50;
   delay response. Multiple bytes of data may be available.
 */
 void serialEvent(){
-  while (Serial.available()){
+  while(Serial.available()){
     // get the new byte:
     char inChar = (char)Serial.read();
     // add it to the inputString:
-    /*if(firstChar == 0){
+    if(firstChar == 1){
       modeSelect = inChar;
-      firstChar = 1;
-    }*/
+      firstChar = 0;
+      Serial.print("First char: ");
+      Serial.println(inChar);
+
+    }else{
+      payload += inChar;
+    }
     
-    inputString += inChar;
     // if the incoming character is a newline, set a flag so the main loop can do something about it:
     if (inChar == '\n') {
       stringComplete = true;
-      //firstChar = 1;
+      firstChar = 1;
     }
   }
 }
 
 void loop(){
-  if(running == 1){
     if(stringComplete){
-      modeSelect = inputString[0];
-      Serial.print(inputString[0]);
-      Serial.print(' ');
-      Serial.print(inputString);
-      if(modeSelect == 'S'){ // Speed
-        Serial.println(inputString);
+      //modeSelect = toupper(inputString[0]);
+      //Serial.print(modeSelect);
+      //Serial.print(' ');
+      //Serial.print(inputString);
       
-      }else if(modeSelect == 'T'){ // Run Test
+      if(modeSelect == 'D'){ // TEST_DRIVE
+        Serial.println("Test Drive");
+        Serial.println("Payload: ");
+        //Serial.println(payload);
+        sysMode = TEST_DRIVE_SPEED;
+      
+      }else if(modeSelect == 'I'){ // TEST_IMU
+        Serial.println("IMU Test");
+        sysMode = TEST_IMU;
+
+      }else if(modeSelect == 'E'){ // Run Test
+        sysMode = IDLE;
 
       }else if(modeSelect == 'X'){
+        sysMode = IDLE;
         running = 0;
       }
-      // clear the string:
-      inputString = "";
+      
+      // Clear the string:
+      payload = "";
       stringComplete = false;
     }
-
-    //if(stall-- > 0){
-      //Serial.print(0.001); // Tachometer
-      //Serial.print("\t");
-      //Serial.print(0); // Tachometer
-      //Serial.print("\t");
-      //Serial.println(0); // Tachometer
-      //motorL_PID.speedDesired = 140;
-      //motorR_PID.speedDesired = 140;
-      //delay(30);
     
-    //}else if(iter++ < 800){
-    //}else if(iter > 0){
-      /*
-      if(iter == 600){
-        if(stall-- > 0){
+    if(sysMode == IDLE){
+      
+      
+    }else if(sysMode == TEST_IMU){
+      //*
+      if(iter++ < 800){
+        if(myICM.dataReady()){
+          myICM.getAGMT();         // The values are only updated when you call 'getAGMT'
+                                  //    printRawAGMT( myICM.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
+          printScaledAGMT(&myICM); // This function takes into account the scale settings from when the measurement was made to calculate the values with units
+        }
+      }else{
+        sysMode = IDLE;
+        iter = 0;
+      }
+      //*/
+    }else if(sysMode == TEST_DRIVE_SPEED){
+        
+        motorL_PID.speedDesired = atof(payload);
+        motorR_PID.speedDesired = atof(payload);
+        
+        motorL.drive(motorL_PID.speedPWM); // Output
+        motorR.drive(motorR_PID.speedPWM); // Output
+
+        pidLeft .Compute();
+        pidRight.Compute();
+
+    }else if(sysMode == TEST_DRIVE){
+      Serial.println("Test Drive");
+      sysMode = IDLE;
+      /*if(stall-- > 0){
+        Serial.print(0.001); // Tachometer
+        Serial.print("\t");
+        Serial.print(0); // Tachometer
+        Serial.print("\t");
+        Serial.println(0); // Tachometer
+        motorL_PID.speedDesired = 140;
+        motorR_PID.speedDesired = 140;
+        delay(30);
+
+      }else if(iter++ < 800){
+        //}else if(iter > 0){
+        //*
+        if(iter == 600){
+          if(stall-- > 0){
+          }else{
+            iter--;
+            iter_coeff = -1;
+          }
+          
         }else{
-          iter--;
-          iter_coeff = -1;
+          iter += iter_coeff;
         }
         
       }else{
-        iter += iter_coeff;
+        sysMode = STOPPED;
       }
-      //*/
-      
+
       //motorL_PID.speedDesired = map(iter, 0, 600, 0, 140);
       //motorR_PID.speedDesired = map(iter, 0, 600, 0, 140);
 
-      /*
       switch(iter){
         //case 200: motorL_PID.speedDesired = 100; motorR_PID.speedDesired = 100; break;
           case 200: motorL_PID.speedDesired = 50;  motorR_PID.speedDesired = 50; break;
@@ -370,52 +418,34 @@ void loop(){
         //case 800: motorL_PID.speedDesired = 40;  motorR_PID.speedDesired = 40; break;
         default: break;
       }
-      //*/
-      
-      //*
-      //pidLeft .Compute();
-      //pidRight.Compute();
 
-      //motorL.drive(motorL_PID.speedPWM); // Output
-      //motorR.drive(motorR_PID.speedPWM); // Output
+      pidLeft .Compute();
+      pidRight.Compute();
+
+      motorL.drive(motorL_PID.speedPWM); // Output
+      motorR.drive(motorR_PID.speedPWM); // Output
 
       // Print information on the serial monitor
-      /*
-      Serial.print(motorL_PID.speedDesired); // Tachometer
-      Serial.print("\t");
-      Serial.print(motorL_PID.speed); // Tachometer
-      Serial.print("\t");
-      Serial.print(motorR_PID.speed); // Tachometer
-      Serial.print("\t");
-      Serial.println();
+        Serial.print(motorL_PID.speedDesired); // Tachometer
+        Serial.print("\t");
+        Serial.print(motorL_PID.speed); // Tachometer
+        Serial.print("\t");
+        Serial.print(motorR_PID.speed); // Tachometer
+        Serial.print("\t");
+        Serial.println();
       //*/
-      
-      /*
-      if(myICM.dataReady()){
-        myICM.getAGMT();         // The values are only updated when you call 'getAGMT'
-                                 //    printRawAGMT( myICM.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
-        printScaledAGMT(&myICM); // This function takes into account the scale settings from when the measurement was made to calculate the values with units
-      }
-      //*
 
-      //motorL.drive(map(motorL_PID.speedPWM, 0, 130, 0, 250)); // Output
-      delay(30);
-
-    //*
-    }else{
+    }else if(sysMode == STOPPED){
+      Serial.println("System Halted");
       Timer1->pause();
       //running = 0;
       motorR_PID.speedDesired = 0;
       motorL_PID.speedDesired = 0;
       motorL.drive(0); // Output
       motorR.drive(0); // Output
-    }
-    //*/
 
-  }else{
-    //brake(motorL, motorR);
-    if(Lfired){
-      Lfired = 0;
+    }else if(sysMode == ACTIVE){
+      
     }
-  }
+    delay(30);
 }
