@@ -3,9 +3,7 @@
 #include <ICM_20948.h> // Sparkfun ICM_20948 IMU module
 #include <PID_v1.h>
 #include "motorClass.h"
-#include <string.h>
-
-using namespace std;
+#include "utilityFuncs.h"
 
 // Hardware Timer check
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
@@ -35,21 +33,12 @@ using namespace std;
 #define SPI_PORT SPI  // 13 // Your desired SPI port.       Used only when "USE_SPI" is defined
 #define CS_PIN 10     // Which pin you connect CS to. Used only when "USE_SPI" is defined
 
-//#define WIRE_PORT Wire // Your desired Wire port.      Used when "USE_SPI" is not defined
-//#define AD0_VAL 1      // The value of the last bit of the I2C address.                
-                       // On the SparkFun 9DoF IMU breakout the default is 1, and when 
-                       // the ADR jumper is closed the value becomes 0
-
 // Configure SPI for IMU
 ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
 
-//volatile long encoderPosL = 0;
-//volatile long encoderPosR = 0;
-
-// Ticks per drive-shaft revolution (different per motor/gearbox)
-const float fullRev         = 1632.67;
+const float fullRev         = 1632.67;    // Ticks per drive-shaft revolution (different per motor/gearbox)
 const float wheelCirc       = 3.14 * 0.8; // Circumference in metres
-const float rpm_coefficient = ((600 / 0.05) / fullRev);
+//const float rpm_coefficient = ((600 / 0.05) / fullRev);
 
 // PID Configuration parameters
 // Specify the links and initial tuning parameters
@@ -60,7 +49,7 @@ struct motorPID {
   double speedError_pre        = 0; // Error 
   double speedErrorSum         = 0; // Sum of errors
   double speed                 = 0; // Calculated wheel speed in RPM
-  double speedDesired          = 100; // PID Set Point
+  double speedDesired          = 0; // PID Set Point
   double speedPWM              = 0; // RPM
   double kp                    = 0; //0.02; // Proportional coefficient
   double ki                    = 0; //16.0; // Integral coefficient
@@ -82,8 +71,8 @@ const int offsetA = 1; //  Set offset values to adjust motor direction if necess
 const int offsetB = 1;
 
 // Initialise motor objects
-Motor motorL = Motor(BIN1, BIN2, PWMB, offsetB, STBY);
-Motor motorR = Motor(AIN1, AIN2, PWMA, offsetA, STBY);
+Motor motorL = Motor(BIN1, BIN2, PWMB, offsetB, STBY); // Left Motor
+Motor motorR = Motor(AIN1, AIN2, PWMA, offsetA, STBY); // Right Motor
 
 //******************************//
 //******* PID SETUP ************//
@@ -94,50 +83,27 @@ PID pidRight(&motorR_PID.speed, &motorR_PID.speedPWM, &motorR_PID.speedDesired, 
 //******************************//
 //******* TIMER SETUP **********//
 //******************************//
-TIM_TypeDef *Instance1 = TIM2;
+TIM_TypeDef   *Instance1 = TIM2; // Creates an instance of hardware Timer 2
 HardwareTimer *Timer1 = new HardwareTimer(Instance1);
 
 //******************************//
 //**** TACHOMETER SETUP ********//
 //******************************//
-tachoWheel tachoR_o;
-tachoWheel tachoL_o;
+tachoWheel tachoR_o; // Right Tachometer Object (Will be integrated into the motor class)
+tachoWheel tachoL_o; // Right Tachometer Object (Will be integrated into the motor class)
 
 //******************************//
-//******* EVENT FLAGS **********//
-//   
-//  Flags for the encoder triggers 
-//  (Mainly for debugging)
+//******** ITERATORS ***********//
 //******************************//
-bool running    = 1;
-bool Lfired     = 0; // Left encoder has fired
-bool Rfired     = 0; // Left encoder has fired
-bool Lrun       = 1; // Process left encoder
-bool Rrun       = 1; // Process right encoder
-bool speedCheck = 0; // Timer speed calculator flag
-
-int iter        = 1; // Loop counter
-int iter_coeff  = 1;
-
-int counter_tmp = 0; // Encoder debugging
-
-bool firstChar  = 1;
+int iter        = 1;         // Loop counter
+int iter_coeff  = 1;         // Multiplier for the loop counter - Changes to negative to provide a triangular iterator
 
 //******************************//
-//******* TIMER SETUP **********//
-//  Quadrature Encoder matrix
-//  2s shouldn't ever appear
-//  Sauce: https://cdn.sparkfun.com/datasheets/Robotics/How%20to%20use%20a%20quadrature%20encoder.pdf
+//****** SERIAL CONFIG *********//
 //******************************//
-int QEM [16] = {0,-1,1,2,1,0,2,-1,-1,2,0,1,2,1,-1,0};
-int LOld = 0; // Previous encoder value left motor
-int ROld = 0; // Previous encoder value right motor
-int LNew = 0; // New encoder value left motor
-int RNew = 0; // New encoder value right motor
-
-char payload[100];     // a String to hold incoming data
+char payload[100];           // Incoming serial payload
 bool stringComplete = false; // whether the string is complete
-char modeSelect = '0';
+char modeSelect;             // Mode select variable - Populated by the first character of the incoming packet
 
 // Speed Calc Callback
 void speedCalc_callback(void){
@@ -145,7 +111,6 @@ void speedCalc_callback(void){
   tachoR_o.calcVelocity();
   motorL_PID.speed = tachoL_o.getVelocity();
   motorR_PID.speed = tachoR_o.getVelocity();
-  speedCheck  = 1;
 }
 
 // Hall encoder ISRs. Called once for each sensor on pin-change (quadrature)
@@ -279,74 +244,55 @@ void setup(){
   Timer1->resume();//*/
 }
 
-// Print value (little endian) as binary to serial
-void printBin(uint16_t input){
-  for(int i = 15; i >= 0; i--){
-    Serial.print((input >> i) & 1);
-    if(i == 4 || i == 8 || i == 12){
-      Serial.print(" ");
-    }
-  }
-}
+
 
 int stall = 50;
 int idx = 0; // Index for serial reading
 
-/*
-  SerialEvent occurs whenever a new data comes in the hardware serial RX. This
-  routine is run between each time loop() runs, so using delay inside loop can
-  delay response. Multiple bytes of data may be available.
-*/
+// This is called immediately before every iteration of loop() to process any serial packets
 void serialEvent(){
   while(Serial.available()){
     // get the new byte:
     char inChar = (char)Serial.read();
-    // add it to the inputString:
-    if(firstChar == 1){
+    
+    // Save the first character (mode select)
+    if(idx == 0){
       modeSelect = inChar;
-      firstChar = 0;
-      Serial.print("First char: ");
-      Serial.println(inChar);
-
+    
     }else{
-      payload += inChar;
+      // Add remaining chars to the payload
+      payload[idx-1] = inChar;
+      Serial.println(idx-1);
     }
     
-    // if the incoming character is a newline, set a flag so the main loop can do something about it:
-    if (inChar == '\n') {
+    idx++;
+    // Check for null terminator
+    if (inChar == '\n'){
       stringComplete = true;
-      firstChar = 1;
+      idx = 0;
     }
   }
 }
 
 void loop(){
+    // If a full packet has been captured at the beginning of the loop, process the result
     if(stringComplete){
-      //modeSelect = toupper(inputString[0]);
-      //Serial.print(modeSelect);
-      //Serial.print(' ');
-      //Serial.print(inputString);
-      
-      if(modeSelect == 'D'){ // TEST_DRIVE
-        Serial.println("Test Drive");
-        Serial.println("Payload: ");
-        //Serial.println(payload);
+            if(modeSelect == 'D'){ Serial.println("Test Drive\n"); Serial.print("Speed (payload): "); printString(payload);
         sysMode = TEST_DRIVE_SPEED;
       
-      }else if(modeSelect == 'I'){ // TEST_IMU
-        Serial.println("IMU Test");
+      }else if(modeSelect == 'I'){ Serial.println("IMU Test");
         sysMode = TEST_IMU;
 
-      }else if(modeSelect == 'E'){ // Run Test
+      }else if(modeSelect == 'E'){ Serial.println("Reset to Idle");
         sysMode = IDLE;
 
-      }else if(modeSelect == 'X'){
+      }else if(modeSelect == 'S'){
         sysMode = IDLE;
-        running = 0;
-      }
       
-      // Clear the string:
-      payload = "";
+      }else if(modeSelect == 'X'){
+        Serial.println("System Halted");
+        sysMode = STOPPED;
+      }
       stringComplete = false;
     }
     
@@ -368,19 +314,38 @@ void loop(){
       //*/
     }else if(sysMode == TEST_DRIVE_SPEED){
         
+      if(payload > 0){
         motorL_PID.speedDesired = atof(payload);
         motorR_PID.speedDesired = atof(payload);
+
+        pidLeft .Compute();
+        pidRight.Compute();
         
         motorL.drive(motorL_PID.speedPWM); // Output
         motorR.drive(motorR_PID.speedPWM); // Output
 
-        pidLeft .Compute();
-        pidRight.Compute();
+        // Print information on the serial monitor
+        Serial.print(motorL_PID.speedDesired); // Tachometer
+        Serial.print("\t");
+        Serial.print(motorL_PID.speed); // Tachometer
+        Serial.print("\t");
+        Serial.print(motorR_PID.speed); // Tachometer
+        Serial.print("\t");
+        Serial.println();
+
+      }else{
+        Serial.println("Brake both motors");
+        motorL.drive(0); // Output
+        motorR.drive(0); // Output
+        delay(20);
+        brake(motorL, motorR);
+      }
 
     }else if(sysMode == TEST_DRIVE){
       Serial.println("Test Drive");
       sysMode = IDLE;
-      /*if(stall-- > 0){
+      //*
+      if(stall-- > 0){
         Serial.print(0.001); // Tachometer
         Serial.print("\t");
         Serial.print(0); // Tachometer
@@ -392,8 +357,7 @@ void loop(){
 
       }else if(iter++ < 800){
         //}else if(iter > 0){
-        //*
-        if(iter == 600){
+        /*if(iter == 600){
           if(stall-- > 0){
           }else{
             iter--;
@@ -402,7 +366,7 @@ void loop(){
           
         }else{
           iter += iter_coeff;
-        }
+        }*/
         
       }else{
         sysMode = STOPPED;
@@ -410,12 +374,12 @@ void loop(){
 
       //motorL_PID.speedDesired = map(iter, 0, 600, 0, 140);
       //motorR_PID.speedDesired = map(iter, 0, 600, 0, 140);
-
+      
+      //*
       switch(iter){
-        //case 200: motorL_PID.speedDesired = 100; motorR_PID.speedDesired = 100; break;
-          case 200: motorL_PID.speedDesired = 50;  motorR_PID.speedDesired = 50; break;
-          case 300: motorL_PID.speedDesired = 100; motorR_PID.speedDesired = 100; break;
-        //case 800: motorL_PID.speedDesired = 40;  motorR_PID.speedDesired = 40; break;
+        case 200: motorL_PID.speedDesired = 80; motorR_PID.speedDesired = 80; break;
+        case 300: motorL_PID.speedDesired = 100; motorR_PID.speedDesired = 100; break;
+        case 700: motorL_PID.speedDesired = 40;  motorR_PID.speedDesired = 40; break;
         default: break;
       }
 
@@ -436,9 +400,6 @@ void loop(){
       //*/
 
     }else if(sysMode == STOPPED){
-      Serial.println("System Halted");
-      Timer1->pause();
-      //running = 0;
       motorR_PID.speedDesired = 0;
       motorL_PID.speedDesired = 0;
       motorL.drive(0); // Output
