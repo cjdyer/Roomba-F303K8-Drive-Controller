@@ -5,8 +5,6 @@
 #include "motorClass.h"
 #include "utilityFuncs.h"
 
-// Another example of pull request
-
 // Hardware Timer check
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION  < 0x01090000)
   #error "Due to API change, this sketch is compatible with STM32_CORE_VERSION  >= 0x01090000"
