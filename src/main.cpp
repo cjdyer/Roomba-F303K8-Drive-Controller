@@ -189,7 +189,7 @@ void setup()
 	while (!Serial) { }
 
 	// Configure Encoder Pins
-	Serial.print("Configuring pins and attaching interrupts... ");
+	//Serial.print("Configuring pins and attaching interrupts... ");
 	pinMode(encoderLA, INPUT);
 	pinMode(encoderLB, INPUT);
 	pinMode(encoderRA, INPUT);
@@ -207,10 +207,10 @@ void setup()
 
 	// Halt both motors
 	brake(motorL, motorR);
-	Serial.println("Done - Brakes applied");
+	//Serial.println("Done - Brakes applied");
 
 	delay(50);
-	Serial.print("Initialising PID controllers... ");
+	//Serial.print("Initialising PID controllers... ");
 	pidLeft.SetMode(AUTOMATIC); //start calculation.
 	pidLeft.SetOutputLimits(-250, 250);
 	pidLeft.SetSampleTime(20);
@@ -218,35 +218,35 @@ void setup()
 	pidRight.SetMode(AUTOMATIC); //start calculation.
 	pidRight.SetOutputLimits(-250, 250);
 	pidRight.SetSampleTime(20);
-	Serial.println("Done");
+	//Serial.println("Done");
 
-	Serial.print("Setting PID characteristics... ");
+	//Serial.print("Setting PID characteristics... ");
 	pidLeft.SetTunings(0.8, 11.0, 0.1); // kP, kI, kD
 	pidRight.SetTunings(0.05, 18.0, 0.01);
-	Serial.println("Done");
+	//Serial.println("Done");
 
-	Serial.println("Initializing IMU... ");
+	//Serial.println("Initializing IMU... ");
 	myICM.begin(CS_PIN, SPI_PORT);
 
 	bool initialized = false;
 	while (!initialized)
 	{
-		Serial.print(F("Initialization of the sensor returned: "));
-		Serial.println(myICM.statusString());
+		//Serial.print(F("Initialization of the sensor returned: "));
+		//Serial.println(myICM.statusString());
 
 		if (myICM.status != ICM_20948_Stat_Ok)
 		{
-			Serial.println("Trying again...");
+			//Serial.println("Trying again...");
 			delay(500);
 		}
 		else
 		{
 			initialized = true;
-			Serial.println("IMU initialized");
+			//Serial.println("IMU initialized");
 		}
 	}
 
-	Serial.print("Configuring Timer... ");
+	//Serial.print("Configuring Timer... ");
 	delay(500);
 	noInterrupts();
 	Timer->setOverflow(60, HERTZ_FORMAT); // Read the tachometers 60 times per second
@@ -254,7 +254,11 @@ void setup()
 	interrupts();
 
 	Timer->resume();
-	Serial.println("Done - Timer Active");
+	//Serial.println("Done - Timer Active");
+	Serial.print("s");
+
+	while ((char)Serial.read() != 's') { }
+	Serial.print("r");
 }
 
 int stall = 50; // A delay value for the top of the testing triangle
@@ -277,7 +281,6 @@ void serialEvent()
 		{
 			// Add remaining chars to the payload
 			payload[idx - 1] = inChar;
-			Serial.println(idx - 1);
 		}
 		
 		// Check for null terminator
@@ -464,5 +467,5 @@ void loop()
 		motorR.drive(0); // Output
 		brake(motorL, motorR);
 	}
-	delay(30);
+	delay(10); // 30 was pretty high. Changed to 10 for smoother communication and operation
 }
