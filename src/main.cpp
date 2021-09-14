@@ -160,25 +160,25 @@ void printFormattedFloat(float val, uint8_t leading, uint8_t decimals)
 void printScaledAGMT(ICM_20948_SPI *sensor)
 {
 	//Serial.print("Scaled. Acc (mg) [ ");
-	printFormattedFloat(sensor->accX(), 5, 2);
-	Serial.print("\t");
-	printFormattedFloat(sensor->accY(), 5, 2);
-	Serial.print("\t");
+	//printFormattedFloat(sensor->accX(), 5, 2);
+	//Serial.print("\t");
+	//printFormattedFloat(sensor->accY(), 5, 2);
+	//Serial.print("\t");
 	printFormattedFloat(sensor->accZ(), 5, 2);
 	Serial.print("\t");
-	printFormattedFloat(sensor->gyrX(), 5, 2);
-	Serial.print("\t");
-	printFormattedFloat(sensor->gyrY(), 5, 2);
-	Serial.print("\t");
+	//printFormattedFloat(sensor->gyrX(), 5, 2);
+	//Serial.print("\t");
+	//printFormattedFloat(sensor->gyrY(), 5, 2);
+	//Serial.print("\t");
 	printFormattedFloat(sensor->gyrZ(), 5, 2);
 	Serial.print("\t");
-	printFormattedFloat(sensor->magX(), 5, 2);
-	Serial.print("\t");
-	printFormattedFloat(sensor->magY(), 5, 2);
-	Serial.print("\t");
+	//printFormattedFloat(sensor->magX(), 5, 2);
+	//Serial.print("\t");
+	//printFormattedFloat(sensor->magY(), 5, 2);
+	//Serial.print("\t");
 	printFormattedFloat(sensor->magZ(), 5, 2);
-	Serial.print("\t");
-	printFormattedFloat(sensor->temp(), 5, 2);
+	//Serial.print("\t");
+	//printFormattedFloat(sensor->temp(), 5, 2);
 	Serial.println();
 }
 
@@ -255,10 +255,10 @@ void setup()
 
 	Timer->resume();
 	//Serial.println("Done - Timer Active");
-	Serial.print("s");
+	//Serial.print("s");
 
-	while ((char)Serial.read() != 's') { }
-	Serial.print("r");
+	//while ((char)Serial.read() != 's') { }
+	//Serial.print("r");
 }
 
 int stall = 50; // A delay value for the top of the testing triangle
@@ -340,20 +340,20 @@ void loop()
 	}
 	else if (sysMode == TEST_IMU)
 	{
-		if (iter++ < 5)
-		{
+		//if (iter++ < 5000)
+		//{
 			if (myICM.dataReady())
 			{
 				myICM.getAGMT();		 // The values are only updated when you call 'getAGMT'
 										 //    printRawAGMT( myICM.agmt );     // Uncomment this to see the raw values, taken directly from the agmt structure
 				printScaledAGMT(&myICM); // This function takes into account the scale settings from when the measurement was made to calculate the values with units
 			}
-		}
-		else
-		{
-			sysMode = IDLE;
-			iter = 0;
-		}
+		//}
+		//else
+		//{
+		//	sysMode = IDLE;
+		//	iter = 0;
+		//}
 		//*/
 	}
 	else if (sysMode == TEST_DRIVE_SPEED)
