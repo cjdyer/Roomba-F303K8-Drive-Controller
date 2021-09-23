@@ -1,68 +1,43 @@
+// Standard Includes
 #include <Arduino.h>
-#include <SparkFun_TB6612.h>
-#include <ICM_20948.h> // Sparkfun ICM_20948 IMU module
-#include <PID_v1.h>
+// #include <iostream>
+
+// Lib Includes
+#include "SparkFun_TB6612.h"
+#include "ICM_20948.h" // Sparkfun ICM_20948 IMU module
+#include "PID_v1.h"
 #include "motorClass.h"
 #include "utilityFuncs.h"
+
+// User Includes
+#include "pins.h"
+#include "motorPID.h"
+#include "printManager.h"
 
 // Hardware Timer check
 #if !defined(STM32_CORE_VERSION) || (STM32_CORE_VERSION < 0x01090000)
 #error "Due to API change, this sketch is compatible with STM32_CORE_VERSION  >= 0x01090000"
 #endif
 
-/* Define Motor Driver Pins */
-#define AIN1 3
-#define BIN1 7
-#define AIN2 4
-#define BIN2 8
-#define PWMA 5
-#define PWMB 6
-#define STBY 9
-
-/* Define encoder pins */
-#define encoderLA A0 //3
-#define encoderLB A1 //2
-#define encoderRA A2 //3
-#define encoderRB A3 //2
-
-/* Strip lines per inch */
-#define stripLPI 150.0
-
-/* IMU definitions */
-
-#define SPI_PORT SPI // 13 // Your desired SPI port.       Used only when "USE_SPI" is defined
-#define CS_PIN 10	 // Which pin you connect CS to. Used only when "USE_SPI" is defined
+#define SERIAL_SIZE 100 // Serial Buffer MAX
+#define stripLPI 150.0  // Strip lines per inch
 
 // Configure SPI for IMU
 ICM_20948_SPI myICM; // If using SPI create an ICM_20948_SPI object
 
-const float fullRev = 1632.67;		// Ticks per drive-shaft revolution (different per motor/gearbox)
-const float wheelCirc = 3.14 * 0.8; // Circumference in metres
+// constexpr saves memory
+constexpr float fullRev = 1632.67;		// Ticks per drive-shaft revolution (different per motor/gearbox)
+constexpr float wheelCirc = 3.14 * 0.8; // Circumference in metres
+
+int stall = 50; // A delay value for the top of the testing triangle
 
 // PID Configuration parameters
 // Specify the links and initial tuning parameters
-struct motorPID
-{
-	volatile long encoderPos = 0; // Current encoder position since the last clearance
-	double speedTotal = 0;		  // Sum of speed measurements
-	double speedError = 0;		  // Difference between
-	double speedError_pre = 0;	  // Error
-	double speedErrorSum = 0;	  // Sum of errors
-	double speed = 0;			  // Calculated wheel speed in RPM
-	double speedDesired = 0;	  // PID Set Point
-	double speedPWM = 0;		  // RPM
-	double kp = 0;				  //0.02; // Proportional coefficient
-	double ki = 0;				  //16.0; // Integral coefficient
-	double kd = 0;				  //0.01; // Derivative coefficient
-
-	float lastKnownPos = 0; // Last Known Position
-	float ticks_per_millisecond = 0;
-
-	long wheelSpeedDistance = 0; // RPM
-} motorL_PID, motorR_PID;
+motorPID motorL_PID;
+motorPID motorR_PID;
 
 // System states/modes
-enum sysModes
+enum SystemState
 {
 	IDLE,
 	TEST_IMU,
@@ -71,13 +46,13 @@ enum sysModes
 	ACTIVE,
 	STOPPED
 };
-int sysMode = IDLE; // Current system state
+SystemState systemState = IDLE; // Current system state
 
 //******************************//
 //******* MOTOR SETUP **********//
 //******************************//
-const int offsetA = 1; //  Set offset values to adjust motor direction if necessary. Values: 1 or -1
-const int offsetB = 1;
+constexpr int offsetA = 1; //  Set offset values to adjust motor direction if necessary. Values: 1 or -1
+constexpr int offsetB = 1;
 
 Motor motorL = Motor(BIN1, BIN2, PWMB, offsetB, STBY); // Left Motor
 Motor motorR = Motor(AIN1, AIN2, PWMA, offsetA, STBY); // Right Motor
@@ -109,9 +84,10 @@ int iter_coeff = 1; // Multiplier for the loop counter - Changes to negative to 
 //******************************//
 //****** SERIAL CONFIG *********//
 //******************************//
-char payload[100];			 // Incoming serial payload
+char payload[SERIAL_SIZE];			 // Incoming serial payload
 char modeSelect;			 // Mode select variable - Populated by the first character of the incoming packet
 bool stringComplete = false; // Serial string completion
+char serial_index = 0;	// Serial buffer index
 
 // Speed Calc Callback
 void speedCalc_callback(void)
@@ -125,62 +101,6 @@ void speedCalc_callback(void)
 // Hall encoder ISRs. Called once for each sensor on pin-change (quadrature)
 void encoderLeft_callback(void) { tachoL_o.encoderTick(); }
 void encoderRight_callback(void) { tachoR_o.encoderTick(); }
-
-// Print the formatted IMU variables
-void printFormattedFloat(float val, uint8_t leading, uint8_t decimals)
-{
-	float aval = abs(val);
-	if (val < 0)
-		Serial.print("-");
-	else
-		Serial.print(" ");
-
-	for (uint8_t indi = 0; indi < leading; indi++)
-	{
-		uint32_t tenpow = 0;
-		if (indi < (leading - 1))
-			tenpow = 1;
-
-		for (uint8_t c = 0; c < (leading - 1 - indi); c++)
-			tenpow *= 10;
-
-		if (aval < tenpow)
-			Serial.print("0");
-		else
-			break;
-	}
-
-	if (val < 0)
-		Serial.print(-val, decimals);
-	else
-		Serial.print(val, decimals);
-}
-
-// Print the scaled and cleaned IMU data
-void printScaledAGMT(ICM_20948_SPI *sensor)
-{
-	//Serial.print("Scaled. Acc (mg) [ ");
-	//printFormattedFloat(sensor->accX(), 5, 2);
-	//Serial.print("\t");
-	//printFormattedFloat(sensor->accY(), 5, 2);
-	//Serial.print("\t");
-	printFormattedFloat(sensor->accZ(), 5, 2);
-	Serial.print("\t");
-	//printFormattedFloat(sensor->gyrX(), 5, 2);
-	//Serial.print("\t");
-	//printFormattedFloat(sensor->gyrY(), 5, 2);
-	//Serial.print("\t");
-	printFormattedFloat(sensor->gyrZ(), 5, 2);
-	Serial.print("\t");
-	//printFormattedFloat(sensor->magX(), 5, 2);
-	//Serial.print("\t");
-	//printFormattedFloat(sensor->magY(), 5, 2);
-	//Serial.print("\t");
-	printFormattedFloat(sensor->magZ(), 5, 2);
-	//Serial.print("\t");
-	//printFormattedFloat(sensor->temp(), 5, 2);
-	Serial.println();
-}
 
 void setup()
 {
@@ -226,7 +146,7 @@ void setup()
 	//Serial.println("Done");
 
 	//Serial.println("Initializing IMU... ");
-	myICM.begin(CS_PIN, SPI_PORT);
+	myICM.begin(CS_PIN);
 
 	bool initialized = false;
 	while (!initialized)
@@ -261,38 +181,25 @@ void setup()
 	//Serial.print("r");
 }
 
-int stall = 50; // A delay value for the top of the testing triangle
-int idx = 0;	// Serial buffer index
-
 // This is called immediately before every iteration of loop() to process any serial packets
 void serialEvent()
 {
 	while (Serial.available())
 	{
-		// get the new byte:
-		char inChar = (char)Serial.read();
+		char inChar = (char)Serial.read(); // get the new byte:
 
-		// Save the first character (mode select)
-		if (idx == 0)
-		{
-			modeSelect = inChar;
-		}
+		if (serial_index == 0)
+			modeSelect = inChar; // Save the first character (mode select)
 		else
-		{
-			// Add remaining chars to the payload
-			payload[idx - 1] = inChar;
-		}
+			payload[serial_index - 1] = inChar; // Add remaining chars to the payload
 		
-		// Check for null terminator
-		if (inChar == '\n')
+		if (inChar == '\n') // Check for null terminator
 		{
 			stringComplete = true;
-			idx = 0;
+			serial_index = 0;
 		}
 		else 
-		{
-			idx++;
-		}
+			serial_index++;
 	}
 }
 
@@ -304,41 +211,41 @@ void loop()
 		if (modeSelect == 'A')
 		{
 			Serial.println("Reset to Idle");
-			sysMode = IDLE;
+			systemState = IDLE;
 		}
 		else if (modeSelect == 'B')
 		{
 			Serial.println("IMU Test");
-			sysMode = TEST_IMU;
+			systemState = TEST_IMU;
 		}
 		else if (modeSelect == 'C')
 		{
 			Serial.println("Test Drive\n");
 			Serial.print("Speed (payload): ");
 			printString(payload);
-			sysMode = TEST_DRIVE_SPEED;
+			systemState = TEST_DRIVE_SPEED;
 		}
 		else if (modeSelect == 'D')
 		{
 			Serial.println("Test Drive Sequence\n");
-			sysMode = TEST_DRIVE;
+			systemState = TEST_DRIVE;
 		}
 		else if (modeSelect == 'X')
 		{
 			Serial.println("System Halted");
-			sysMode = STOPPED;
+			systemState = STOPPED;
 		}
 		stringComplete = false;
 	}
 
-	if (sysMode == IDLE)
+	if (systemState == IDLE)
 	{
 		motorR_PID.speedDesired = 0;
 		motorL_PID.speedDesired = 0;
 		motorL.drive(0); // Output
 		motorR.drive(0); // Output
 	}
-	else if (sysMode == TEST_IMU)
+	else if (systemState == TEST_IMU)
 	{
 		//if (iter++ < 5000)
 		//{
@@ -356,7 +263,7 @@ void loop()
 		//}
 		//*/
 	}
-	else if (sysMode == TEST_DRIVE_SPEED)
+	else if (systemState == TEST_DRIVE_SPEED)
 	{
 
 		if (payload > 0)
@@ -371,14 +278,7 @@ void loop()
 			motorL.drive(motorL_PID.speedPWM); // Output
 			motorR.drive(motorR_PID.speedPWM); // Output
 
-			// Print information on the serial monitor
-			Serial.print(motorL_PID.speedDesired); // Tachometer
-			Serial.print("\t");
-			Serial.print(motorL_PID.speed); // Tachometer
-			Serial.print("\t");
-			Serial.print(motorR_PID.speed); // Tachometer
-			Serial.print("\t");
-			Serial.println();
+			printMotorData(&motorL_PID, &motorR_PID);
 		}
 		else
 		{
@@ -389,7 +289,7 @@ void loop()
 			brake(motorL, motorR);
 		}
 	}
-	else if (sysMode == TEST_DRIVE)
+	else if (systemState == TEST_DRIVE)
 	{
 		if (stall-- > 0)
 		{
@@ -418,7 +318,7 @@ void loop()
 		}
 		else
 		{
-			sysMode = IDLE;
+			systemState = IDLE;
 		}
 
 		// Used for the triangle test
@@ -449,17 +349,9 @@ void loop()
 		motorL.drive(motorL_PID.speedPWM); // Output
 		motorR.drive(motorR_PID.speedPWM); // Output
 
-		// Print information on the serial monitor
-		Serial.print(motorL_PID.speedDesired); // Tachometer
-		Serial.print("\t");
-		Serial.print(motorL_PID.speed); // Tachometer
-		Serial.print("\t");
-		Serial.print(motorR_PID.speed); // Tachometer
-		Serial.print("\t");
-		Serial.println();
-		//*/
+		printMotorData(&motorL_PID, &motorR_PID); // Print information on the serial monitor
 	}
-	else if (sysMode == STOPPED)
+	else if (systemState == STOPPED)
 	{
 		motorR_PID.speedDesired = 0;
 		motorL_PID.speedDesired = 0;
