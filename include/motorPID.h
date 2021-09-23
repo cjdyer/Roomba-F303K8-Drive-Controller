@@ -3,6 +3,7 @@
 
 class motorPID
 {
+public:
 	long encoderPos = 0; // Current encoder position since the last clearance
 	double speedTotal = 0;		  // Sum of speed measurements
 	double speedError = 0;		  // Difference between

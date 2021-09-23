@@ -78,12 +78,18 @@ private:
     const uint8_t max_completion_error_;
     const uint8_t min_derivative_;
     const uint16_t integral_limit_;
+    const double derivative_gain_;
 
     double error_;
     double past_error_;
     double integral_;
     double derivative_;
     double start_time_;
+    double last_value_;
+    double last_time_;
+    double last_derivative_;
+
+;
 };
 
 #endif
