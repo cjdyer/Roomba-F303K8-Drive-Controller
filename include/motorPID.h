@@ -1,9 +1,9 @@
 #ifndef MOTOR_PID_H
 #define MOTOR_PID_H
 
-struct motorPID
+class motorPID
 {
-	volatile long encoderPos = 0; // Current encoder position since the last clearance
+	long encoderPos = 0; // Current encoder position since the last clearance
 	double speedTotal = 0;		  // Sum of speed measurements
 	double speedError = 0;		  // Difference between
 	double speedError_pre = 0;	  // Error
