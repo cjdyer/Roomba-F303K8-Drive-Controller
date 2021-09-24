@@ -16,8 +16,4 @@
 #define encoderRA A2 //3
 #define encoderRB A3 //2
 
-/* IMU definitions */
-#define SPI_PORT SPI // 13 // Your desired SPI port.       Used only when "USE_SPI" is defined
-#define CS_PIN 10	 // Which pin you connect CS to. Used only when "USE_SPI" is defined
-
 #endif
