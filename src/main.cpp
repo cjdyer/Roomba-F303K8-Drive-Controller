@@ -6,17 +6,17 @@
 #include "PID.h"
 #include "MotorManager.h"
 
-Encoder leftEncoder(encoderLA, encoderLB); // Left Tachometer Object (Will be integrated into the motor class)
-Encoder rightEncoder(encoderRB, encoderRA); // Right Tachometer Object (Will be integrated into the motor class)
+Encoder leftEncoder(encoderLA, encoderLB);
+Encoder rightEncoder(encoderRB, encoderRA); 
 
 void leftEncoder_callback(void) { leftEncoder.encoderTick();  }
-void rightEncoder_callback(void) { rightEncoder.encoderTick();  }
+void rightEncoder_callback(void) { rightEncoder.encoderTick();  } // This has to be defined here as the encoders exist in this scope.
 
 Motor leftMotor(BIN1, BIN2, PWMB, STBY);
 Motor rightMotor(AIN1, AIN2, PWMA, STBY);
 
-PID leftPID(0,0,0,0);
-PID rightPID(0,0,0,0);
+PID leftPID(2,0.0005, 0);
+PID rightPID(2,0.0005, 0);
 
 MotorManager leftMotorManager(&leftMotor, &leftEncoder, &leftPID);
 MotorManager rightMotorManager(&rightMotor, &rightEncoder, &rightPID);
@@ -35,30 +35,17 @@ void setup()
 
 void loop()
 {
-    // leftMotorManager.printEncoder();
-    // Serial.print("\t");
-    // rightMotorManager.printEncoder();
-    // Serial.println();
+    leftPID.SetTarget(1000);
+    rightPID.SetTarget(1000);
+    Serial.print("LEFT Encoder Value : ");
+    Serial.print(leftMotorManager.getEncoder());
+    Serial.print("\tOutput Value : ");
+    Serial.print(leftPID.Calculate(leftMotorManager.getEncoder()));
+    Serial.print("\t RIGHT Encoder Value : ");
+    Serial.print(rightMotorManager.getEncoder());
+    Serial.print("\tOutput Value : ");
+    Serial.println(rightPID.Calculate(rightMotorManager.getEncoder()));
 
-    leftMotorManager.drive(255);
-    for (int i = 0; i < 500; i++)
-    {
-        delay(10);
-    }
-    leftMotorManager.brake();
-    for (int i = 0; i < 50; i++)
-    {
-        delay(10);
-    }
-    leftMotorManager.drive(-255);
-    for (int i = 0; i < 500; i++)
-    {
-        delay(10);
-    }
-    leftMotorManager.brake();
-    for (int i = 0; i < 50; i++)
-    {
-        delay(10);
-    }
-    
+    leftMotorManager.drive(-leftPID.Calculate(leftMotorManager.getEncoder()));
+    rightMotorManager.drive(-rightPID.Calculate(rightMotorManager.getEncoder()));
 }

@@ -12,9 +12,8 @@ public:
      * @param _kP Proportional multiplier
      * @param _kI Integral multiplier
      * @param _kD Derivative multipler
-     * @param _id ID of component PID is controlling
     **/
-    PID (double _kP, double _kI, double _kD, const char _id);
+    PID (const float _kP, const float _kI, const float _kD);
     
 
     /**
@@ -24,7 +23,7 @@ public:
      * 
      * @return The power for related motor
     **/
-    double Calculate(double _sensorVal);
+    double Calculate(int32_t _sensorVal);
     
     /**
      * Has the PID control finished?
@@ -38,7 +37,7 @@ public:
      *
      * @param _target the desired finishing sensor value
     **/
-    void SetTarget(double _target);
+    void SetTarget(int32_t _target);
     
     /**
      * Starts the PID timer
@@ -60,12 +59,9 @@ public:
      * @return the PID target
     **/
     int GetTarget();
-
-public:
-    const char ID;
     
 protected:
-    double target;
+    int32_t target;
         
 private:
     const float kP_;
@@ -74,22 +70,21 @@ private:
 
     const uint8_t min_output_;
     const uint8_t max_output_;
-    const uint8_t max_time_;
     const uint8_t max_completion_error_;
     const uint8_t min_derivative_;
     const uint16_t integral_limit_;
-    const double derivative_gain_;
+    const uint16_t max_time_;
+    const float derivative_gain_;
 
-    double error_;
-    double past_error_;
-    double integral_;
+    int32_t error_; // Should theoretically be int64_t but.... (in the case of INT32_MAX - (-INT32_MAX))
+    int32_t past_error_;
+    int32_t integral_;
+    uint32_t last_time_;
+    uint32_t start_time_;
+
     double derivative_;
-    double start_time_;
-    double last_value_;
-    double last_time_;
+    double last_sensor_value_;
     double last_derivative_;
-
-;
 };
 
 #endif

@@ -7,14 +7,14 @@ MotorManager::MotorManager(Motor* _motor, Encoder* _encoder, PID* _pid)
     pid_ = _pid;
 }
 
-void MotorManager::printEncoder()
+int32_t& MotorManager::getEncoder()
 {
-    Serial.print(encoder_->getPosition());
+    return encoder_->getPosition();
 }
 
 void MotorManager::drive(int16_t _speed)
 {
-    motor_->drive(_speed, _forwards);
+    motor_->drive(_speed);
 }
 
 void MotorManager::brake()

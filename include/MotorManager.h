@@ -11,7 +11,7 @@ class MotorManager
 public:
     MotorManager(Motor* _motor, Encoder* _encoder, PID* _pid);
 
-    void printEncoder();
+    int32_t& getEncoder();
     void drive(int16_t _speed);
     void brake();
 
