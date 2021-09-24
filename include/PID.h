@@ -23,27 +23,27 @@ public:
      * 
      * @return The power for related motor
     **/
-    double Calculate(int32_t _sensorVal);
+    double calculate(int32_t _sensorVal);
     
     /**
      * Has the PID control finished?
      * 
      * @return true is PID is completed, flase if not
     **/
-    bool Done();
+    bool done();
     
     /**
      * Set a new target (set point) for the PID controller
      *
      * @param _target the desired finishing sensor value
     **/
-    void SetTarget(int32_t _target);
+    void setTarget(int32_t _target);
     
     /**
      * Starts the PID timer
      * This allows for done() due to timeout
     **/
-    void StartTimer();
+    void startTimer();
 
     /**
      * Reset the error, integral, and derivative terms
@@ -51,14 +51,14 @@ public:
      * This is for when a completely new target is being set,
      * and previos values need to be cleared.
     **/
-    void ResetPID();
+    void reset();
 
     /**
      * Getter function for the PID's target
      * 
      * @return the PID target
     **/
-    int GetTarget();
+    int getTarget();
     
 protected:
     int32_t target;

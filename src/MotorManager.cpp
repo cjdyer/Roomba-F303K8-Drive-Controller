@@ -12,12 +12,15 @@ int32_t& MotorManager::getEncoder()
     return encoder_->getPosition();
 }
 
-void MotorManager::drive(int16_t _speed)
+void MotorManager::driveTo(int16_t _target)
 {
-    motor_->drive(_speed);
+    pid_->reset();
+    pid_->setTarget(_target);
 }
 
-void MotorManager::brake()
+void MotorManager::run()
 {
-    motor_->brake();
+    int32_t& encoder_value = encoder_->getPosition();
+    double pid_value = pid_->calculate(encoder_value);
+    motor_->drive(pid_value);
 }

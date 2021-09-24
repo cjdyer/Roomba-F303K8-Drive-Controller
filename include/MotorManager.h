@@ -12,8 +12,8 @@ public:
     MotorManager(Motor* _motor, Encoder* _encoder, PID* _pid);
 
     int32_t& getEncoder();
-    void drive(int16_t _speed);
-    void brake();
+    void driveTo(int16_t _target);
+    void run();
 
 private:
     Motor* motor_;

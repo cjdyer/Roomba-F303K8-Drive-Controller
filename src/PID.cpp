@@ -9,7 +9,7 @@ PID::PID(const float _kP, const float _kI, const float _kD) :
     target(0), kP_(_kP), kI_(_kI), kD_(_kD), min_output_(255), max_output_(255), max_completion_error_(5), 
     min_derivative_(0), integral_limit_(1000000), max_time_(255), derivative_gain_(0.8) {}
 
-double PID::Calculate(int32_t _sensor_value)
+double PID::calculate(int32_t _sensor_value)
 {
     uint32_t current_time = micros();
     uint32_t time_difference = current_time - last_time_;
@@ -42,7 +42,7 @@ double PID::Calculate(int32_t _sensor_value)
     return output;
 }
 
-bool PID::Done() 
+bool PID::done() 
 {
     /**
      * TODO: More complete conditions
@@ -58,17 +58,17 @@ bool PID::Done()
     return false;
 }
 
-void PID::SetTarget(int32_t _target)
+void PID::setTarget(int32_t _target)
 {
     target = _target;
 }
 
-void PID::StartTimer()
+void PID::startTimer()
 {
     start_time_ = micros();
 }
 
-void PID::ResetPID()
+void PID::reset()
 {
     error_ = 0;
     past_error_ = 0;
@@ -77,7 +77,7 @@ void PID::ResetPID()
     start_time_ = 0;
 }
 
-int PID::GetTarget()
+int PID::getTarget()
 {
     return target;
 }
