@@ -5,20 +5,25 @@
 #include "Motor.h"
 #include "PID.h"
 #include "Encoder.h"
+#include "pins.h"
 
 class MotorManager
 {
 public:
-    MotorManager(Motor* _motor, Encoder* _encoder, PID* _pid);
+    MotorManager(const bool _left);
 
-    int32_t& getEncoder();
     void driveTo(int16_t _target);
     void run();
 
-private:
-    Motor* motor_;
+public:
     Encoder* encoder_;
+    Motor* motor_;
     PID* pid_;
+
+private:
+    bool active_;
 };
+
+void (*encoderCallback(MotorManager *_motorManager))();
 
 #endif

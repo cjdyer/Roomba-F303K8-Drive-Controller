@@ -14,7 +14,7 @@ void Encoder::encoderTick()
     last_state_ = current_state;
 }
 
-int32_t& Encoder::getPosition()
+int32_t Encoder::getPosition()
 {
     return position_;
 }
