@@ -1,51 +1,48 @@
 #include "MotorManager.h"
+#include "pins.h"
 
-
-MotorManager::MotorManager(const bool _left)
+MotorManager::MotorManager()
 {
-    if (_left)
-    {
-        encoder_ = new Encoder(encoderLA, encoderLB);
-        motor_ = new Motor(BIN1, BIN2, PWMB, STBY);
-        pid_ = new PID(2, 0.0005, 0);
+    void (*left_callback)() = encoderCallback(left_drive_.encoder_);
+    void (*right_callback)() = encoderCallback(right_drive_.encoder_);
 
-        void (*pointer_to_callback)() = encoderCallback(this);
-        attachInterrupt(encoderLA, pointer_to_callback, CHANGE);
-        attachInterrupt(encoderLB, pointer_to_callback, CHANGE);
-    }
-    else
-    {
-        encoder_ = new Encoder(encoderRB, encoderRA);
-        motor_ = new Motor(AIN1, AIN2, PWMA, STBY);;
-        pid_ = new PID(2, 0.0005, 0);
+    left_drive_.encoder_ = new Encoder(encoderLA, encoderLB);
+    right_drive_.encoder_ = new Encoder(encoderRB, encoderRA);
 
-        void (*pointer_to_callback)() = encoderCallback(this);
-        attachInterrupt(encoderRA, pointer_to_callback, CHANGE);
-        attachInterrupt(encoderRB, pointer_to_callback, CHANGE);
-    }
+    left_drive_.motor_ = new Motor(BIN1, BIN2, PWMB, STBY);
+    right_drive_.motor_ = new Motor(AIN1, AIN2, PWMA, STBY);
+
+    left_drive_.pid_ = new PID(2, 0.0005, 0);
+    right_drive_.pid_ = new PID(2, 0.0005, 0);
+
+    attachInterrupt(encoderLA, left_callback, CHANGE);
+    attachInterrupt(encoderLB, left_callback, CHANGE);
+    attachInterrupt(encoderRA, right_callback, CHANGE);
+    attachInterrupt(encoderRB, right_callback, CHANGE);
 }
 
-void MotorManager::driveTo(int16_t _target)
+void MotorManager::driveTo(int16_t _x, int16_t _y)
 {
-    pid_->reset();
-    pid_->setTarget(_target);
-    active_ = true;
+
+    // pid_->reset();
+    // pid_->setTarget(_target);
+    // active_ = true;
 }
 
 void MotorManager::run()
 {
-    if (active_)
-    {
-        int32_t encoder_value = encoder_->getPosition();
-        double pid_value = pid_->calculate(encoder_value);
-        motor_->drive(pid_value);
+    // if (active_)
+    // {
+    //     int32_t encoder_value = encoder_->getPosition();
+    //     double pid_value = pid_->calculate(encoder_value);
+    //     motor_->drive(pid_value);
 
-        if(pid_->done())
-        {
-            active_ = false;
-            motor_->drive(0);
-        }
-    }
+    //     if(pid_->done())
+    //     {
+    //         active_ = false;
+    //         motor_->drive(0);
+    //     }
+    // }
 }
 
-void (*encoderCallback(MotorManager *_motorManager))() { _motorManager->encoder_->encoderTick(); }
+void (*encoderCallback(Encoder *_encoder))() { _encoder->encoderTick(); }
