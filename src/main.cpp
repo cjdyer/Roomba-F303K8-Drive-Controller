@@ -15,7 +15,6 @@ float gx_rps, gy_rps, gz_rps;
 int16_t mx, my, mz;
 
 float roll_angle, pitch_angle, yaw_angle;	// euler angles
-float init_roll_angle, init_pitch_angle, init_yaw_angle;	// euler angles
 float roll_angle_accel, pitch_angle_accel;
 
 bool init_set = false;
@@ -23,12 +22,7 @@ bool beta_settled = false;
 float yaw_angle_init = -1000;
 
 ICM imu;
-MADGWICK_AHRS madgwickFilter(BETA);
-
-void accelAngles(float& roll_angle_accel, float& pitch_angle_accel) {
-	roll_angle_accel = atan2(ay, az) * RAD2DEG;
-	pitch_angle_accel = atan2(-ax, sqrt(pow(ay, 2) + pow(az, 2))) * RAD2DEG;
-}
+MADGWICK_AHRS madgwickFilter(BETA_INIT);
 
 void setup()
 {
@@ -53,14 +47,6 @@ void loop()
 
 	// TODO: Check if there is a benefit from magnetometer data
 	madgwickFilter.get_euler_quaternion(dt_s, ax, ay, az, gx_rps, gy_rps, gz_rps, 0, 0, 0, roll_angle, pitch_angle, yaw_angle);
-
-    if (!init_set)
-    {
-        init_roll_angle = roll_angle;
-        init_pitch_angle = pitch_angle;
-        init_yaw_angle = yaw_angle;
-        init_set = true;
-    }
 
     accelAngles(roll_angle_accel, pitch_angle_accel);
 

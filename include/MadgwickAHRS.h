@@ -46,4 +46,6 @@ class MADGWICK_AHRS
 	float invSqrt(float x);
 };
 
+void accelAngles(float& roll_angle_accel, float& pitch_angle_accel);
+
 #endif
