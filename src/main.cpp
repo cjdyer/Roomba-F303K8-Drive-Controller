@@ -1,57 +1,34 @@
-/****************************************************************
- * Example6_DMP_Quat9_Orientation.ino
- * ICM 20948 Arduino Library Demo
- * Initialize the DMP based on the TDK InvenSense ICM20948_eMD_nucleo_1.0 example-icm20948
- * Paul Clark, April 25th, 2021
- * Based on original code by:
- * Owen Lyke @ SparkFun Electronics
- * Original Creation Date: April 17 2019
- * 
- * ** This example is based on InvenSense's _confidential_ Application Note "Programming Sequence for DMP Hardware Functions".
- * ** We are grateful to InvenSense for sharing this with us.
- * 
- * ** Important note: by default the DMP functionality is disabled in the library
- * ** as the DMP firmware takes up 14301 Bytes of program memory.
- * ** To use the DMP, you will need to:
- * ** Edit ICM_20948_C.h
- * ** Uncomment line 29: #define ICM_20948_USE_DMP
- * ** Save changes
- * ** If you are using Windows, you can find ICM_20948_C.h in:
- * ** Documents\Arduino\libraries\SparkFun_ICM-20948_ArduinoLibrary\src\util
- *
- * Please see License.md for the license information.
- *
- * Distributed as-is; no warranty is given.
- ***************************************************************/
+#include "custom_IMU.h"
+#include "MadgwickAHRS.h"
 
-#include "IMU.h" // Click here to get the library: http://librarymanager/All#SparkFun_ICM_20948_IMU
+#define BETA		0.033
+#define BETA_INIT	10
 
-#define IMU_SPI_PORT SPI
-#define IMU_CS_PIN 10
+const float RAD2DEG = (float) 4068 / 71;
 
-ICM20948_SPI imu(IMU_CS_PIN, IMU_SPI_PORT);
+uint32_t t0, t;
+int32_t dt;
+float dt_s;
 
-// accelerometer resolution
-float accelRes;
-
-// imu measurements
 int16_t ax, ay, az;
 float gx_rps, gy_rps, gz_rps;
 int16_t mx, my, mz;
 
-// quadcopter pose
 float roll_angle, pitch_angle, yaw_angle;	// euler angles
-float pose_q[4];	// quaternion
+float init_roll_angle, init_pitch_angle, init_yaw_angle;	// euler angles
+float roll_angle_accel, pitch_angle_accel;
 
-// filtered gyro rates
-float roll_rate, pitch_rate, yaw_rate;
+bool init_set = false;
+bool beta_settled = false;
+float yaw_angle_init = -1000;
 
-volatile bool imuInterrupt = false;
-void imuReady() {
-	imuInterrupt = true;
+ICM imu;
+MADGWICK_AHRS madgwickFilter(BETA);
+
+void accelAngles(float& roll_angle_accel, float& pitch_angle_accel) {
+	roll_angle_accel = atan2(ay, az) * RAD2DEG;
+	pitch_angle_accel = atan2(-ax, sqrt(pow(ay, 2) + pow(az, 2))) * RAD2DEG;
 }
-
-bool imuCalibration();
 
 void setup()
 {
@@ -59,10 +36,7 @@ void setup()
     while (!Serial);
 
     SPI.begin();
-
-	
-    imuCalibration();
-    imu.read_accelRes(accelRes);
+    imu.init();
 }
 
 void loop()
@@ -77,82 +51,42 @@ void loop()
 	// read accel and gyro measurements
 	imu.read_accel_gyro_rps(ax, ay, az, gx_rps, gy_rps, gz_rps);
 
-    // perform sensor fusion with Madgwick filter to calculate pose
 	// TODO: Check if there is a benefit from magnetometer data
-	madgwickFilter.get_euler_quaternion(dt_s, ax, ay, az, gx_rps, gy_rps, gz_rps, 0, 0, 0, roll_angle, pitch_angle, yaw_angle, pose_q);
-}
+	madgwickFilter.get_euler_quaternion(dt_s, ax, ay, az, gx_rps, gy_rps, gz_rps, 0, 0, 0, roll_angle, pitch_angle, yaw_angle);
 
-// calibrate gyroscope, accelerometer or magnetometer on rc command and return true if any calibration was performed
-bool imuCalibration() {
-	static uint32_t t_imuCalibration;
-	t_imuCalibration = micros();
-	
-	static uint32_t t_calibrateGyro = 0, t_calibrateAccel = 0, t_calibrateMag = 0;
-    if ((rc_channelValue[THROTTLE] < 1100) && (rc_channelValue[YAW] < 1100)) {
-        // hold right stick bottom center and left stick bottom-left to start gyro calibration	(2s)
-        t_calibrateAccel = 0;
-        t_calibrateMag = 0;
-        if (t_calibrateGyro == 0) {
-            t_calibrateGyro = t_imuCalibration;
-            return false;
-        }
-        else if ((t_imuCalibration - t_calibrateGyro) > 2000000) {
-            // turn on LED to indicate calibration
-            updateLED(LED_PIN, 2);
-            imu.calibrate_gyro(imuInterrupt, 5.0, 1, data_eeprom.offset_gx_1000dps, data_eeprom.offset_gy_1000dps, data_eeprom.offset_gz_1000dps);
-            t_calibrateGyro = 0;
-            // turn off LED
-            updateLED(LED_PIN, 0);
-            return true;
-        }
-        else {
-            return false;
-        }
+    if (!init_set)
+    {
+        init_roll_angle = roll_angle;
+        init_pitch_angle = pitch_angle;
+        init_yaw_angle = yaw_angle;
+        init_set = true;
     }
-    else if ((rc_channelValue[THROTTLE] > 1900) && (rc_channelValue[YAW] < 1100)) {
-        // hold right stick bottom center and left stick top-left to start accel calibration	(2s)
-        t_calibrateGyro = 0;
-        t_calibrateMag = 0;
-        if (t_calibrateAccel == 0) {
-            t_calibrateAccel = t_imuCalibration;
-            return false;
+
+    accelAngles(roll_angle_accel, pitch_angle_accel);
+
+    if (!beta_settled)
+    {
+        if ((abs(roll_angle_accel - roll_angle) < 0.5) && (abs(pitch_angle_accel - pitch_angle) < 0.5) && ((abs(yaw_angle - yaw_angle_init) / dt_s) < 0.05)) {
+            madgwickFilter.set_beta(BETA);
+                
+            Serial.println("Initial pose estimated.");
+
+            beta_settled = true;
         }
-        else if ((t_imuCalibration - t_calibrateAccel) > 2000000) {
-            // turn on LED to indicate calibration
-            updateLED(LED_PIN, 2);
-            imu.calibrate_accel(imuInterrupt, 5.0, 16, data_eeprom.offset_ax_32g, data_eeprom.offset_ay_32g, data_eeprom.offset_az_32g);
-            EEPROM.put(ADDRESS_EEPROM, data_eeprom);
-            t_calibrateAccel = 0;
-            // turn off LED
-            updateLED(LED_PIN, 0);
-            return true;
-        }
-        else {
-            return false;
-        }
+        yaw_angle_init = yaw_angle;
     }
-    else if ((rc_channelValue[THROTTLE] > 1900) && (rc_channelValue[YAW] > 1900)) {
-        // hold right stick bottom center and left stick top-right to start mag calibration	(2s)
-        t_calibrateGyro = 0;
-        t_calibrateAccel = 0;
-        if (t_calibrateMag == 0) {
-            t_calibrateMag = t_imuCalibration;
-            return false;
+    else
+    {
+        static uint32_t t0_serial = millis();
+        if (millis() - t0_serial > 500) {
+            t0_serial = millis();
+        
+            Serial.print("Roll :  ");
+            Serial.print(roll_angle, 5);  
+            Serial.print("  Pitch :  ");
+            Serial.print(pitch_angle, 5);  
+            Serial.print("  Yaw :  ");
+            Serial.println(yaw_angle - yaw_angle_init, 5);
         }
-        else if ((t_imuCalibration - t_calibrateMag) > 2000000) {
-            imu.calibrate_mag(imuInterrupt, 60, 500, data_eeprom.offset_mx, data_eeprom.offset_my, data_eeprom.offset_mz, data_eeprom.scale_mx, data_eeprom.scale_my, data_eeprom.scale_mz);
-            EEPROM.put(ADDRESS_EEPROM, data_eeprom);
-            t_calibrateMag = 0;
-            return true;
-        }
-        else {
-            return false;
-        }
-    }
-	
-	t_calibrateGyro = 0;
-	t_calibrateAccel = 0;
-	t_calibrateMag = 0;
-	
-	return false;
+    } 
 }

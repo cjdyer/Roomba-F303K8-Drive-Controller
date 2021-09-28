@@ -1,5 +1,5 @@
-#ifndef TACHO_WHEEL_H
-#define TACHO_WHEEL_H
+#ifndef ENCODER_H
+#define ENCODER_H
 
 #include <Arduino.h>
 

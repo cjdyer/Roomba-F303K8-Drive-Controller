@@ -1,58 +1,14 @@
-/***************************************************************************//**
- * @file ICM20948.h
- *******************************************************************************
- * @section License
- * <b>(C) Copyright 2017 Silicon Labs, http://www.silabs.com</b>
- *******************************************************************************
- *
- * SPDX-License-Identifier: Apache-2.0
- *
- * Licensed under the Apache License, Version 2.0 (the "License"); you may
- * not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- * http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
- * WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- *
- ******************************************************************************/
+#ifndef ALT_IMU_REGS_H
+#define ALT_IMU_REGS_H
 
-#ifndef ICM20948_H
-#define ICM20948_H
-
-#include <SPI.h>
-
-/** @cond DO_NOT_INCLUDE_WITH_DOXYGEN */
-
-/**************************************************************************//**
-* @name Error Codes
-* @{
-******************************************************************************/
 #define OK                                  0x0000                      /**< No errors          */
 #define ERROR                               0x0001                      /**< Error              */
-/**@}*/
 
-/**************************************************************************//**
-* @name ICM20948 register banks
-* @{
-******************************************************************************/
 #define ICM20948_BANK_0                     (0 << 7)                    /**< Register bank 0    */
 #define ICM20948_BANK_1                     (1 << 7)                    /**< Register bank 1    */
 #define ICM20948_BANK_2                     (2 << 7)                    /**< Register bank 2    */
 #define ICM20948_BANK_3                     (3 << 7)                    /**< Register bank 3    */
-/**@}*/
 
-/**************************************************************************//**
-* @name Register and associated bit definitions
-* @{
-******************************************************************************/
-/***********************/
-/* Bank 0 register map */
-/***********************/
 #define ICM20948_REG_WHO_AM_I               (ICM20948_BANK_0 | 0x00)    /**< Device ID register                                     */
 
 #define ICM20948_REG_USER_CTRL              (ICM20948_BANK_0 | 0x03)    /**< User control register                                  */
@@ -146,9 +102,6 @@
 #define ICM20948_BIT_MULTI_FIFO_CFG         0x01                        /**< Interrupt status for each sensor is required           */
 #define ICM20948_BIT_SINGLE_FIFO_CFG        0x00                        /**< Interrupt status for only a single sensor is required  */
 
-/***********************/
-/* Bank 1 register map */
-/***********************/
 #define ICM20948_REG_XA_OFFSET_H            (ICM20948_BANK_1 | 0x14)    /**< Acceleration sensor X-axis offset cancellation high byte   */
 #define ICM20948_REG_XA_OFFSET_L            (ICM20948_BANK_1 | 0x15)    /**< Acceleration sensor X-axis offset cancellation low byte    */
 #define ICM20948_REG_YA_OFFSET_H            (ICM20948_BANK_1 | 0x17)    /**< Acceleration sensor Y-axis offset cancellation high byte   */
@@ -158,9 +111,6 @@
 
 #define ICM20948_REG_TIMEBASE_CORR_PLL      (ICM20948_BANK_1 | 0x28)    /**< PLL Timebase Correction register                           */
 
-/***********************/
-/* Bank 2 register map */
-/***********************/
 #define ICM20948_REG_GYRO_SMPLRT_DIV        (ICM20948_BANK_2 | 0x00)    /**< Gyroscope Sample Rate Divider register     */
 
 #define ICM20948_REG_GYRO_CONFIG_1          (ICM20948_BANK_2 | 0x01)    /**< Gyroscope Configuration 1 register         */
@@ -226,9 +176,6 @@
 #define ICM20948_REG_ACCEL_CONFIG_2         (ICM20948_BANK_2 | 0x15)    /**< Accelerometer Configuration 2 register             */
 #define ICM20948_BIT_ACCEL_CTEN             0x1C                        /**< Accelerometer Self-Test Enable bits                */
 
-/***********************/
-/* Bank 3 register map */
-/***********************/
 #define ICM20948_REG_I2C_MST_ODR_CONFIG     (ICM20948_BANK_3 | 0x00)    /**< I2C Master Output Data Rate Configuration register */
 
 #define ICM20948_REG_I2C_MST_CTRL           (ICM20948_BANK_3 | 0x01)    /**< I2C Master Control register                        */
@@ -274,14 +221,10 @@
 #define ICM20948_BIT_I2C_GRP                0x10                        /**< I2C Slave Group bit                                */
 #define ICM20948_BIT_I2C_READ               0x80                        /**< I2C Slave R/W bit                                  */
 
-/* Register common for all banks */
 #define ICM20948_REG_BANK_SEL               0x7F                        /**< Bank Select register                               */
 
 #define ICM20948_DEVICE_ID                  0xEA                        /**< Device ID value                                    */
 
-/*****************************/
-/* AK09916 register map */
-/*****************************/
 #define AK09916_REG_WHO_AM_I                0x01                        /**< AK09916 Device ID register             */
 #define AK09916_DEVICE_ID                   0x09                        /**< AK09916 Device ID value                */
 
@@ -312,365 +255,5 @@
 
 #define AK09916_REG_WHO_AM_I                0x01                        /**< AK09916 Device ID register             */
 #define AK09916_BIT_I2C_SLV_ADDR            0x0C                        /**< AK09916 I2C Slave Address              */
-/**@}*/
-
-/** @endcond */
-
-class ICM20948 {
-
-public:
-    /** 
-     * ICM20948 constructor
-     */
-    ICM20948(void);
-
-    /**
-     * ICM20948 destructor
-     */
-    ~ICM20948(void);
-
-    /** Probe for ICM20948 and try to initialize sensor
-     *
-     * @param[in] offset_gx_1000dps Gyroscope X axis offset in current full scale format.
-     * @param[in] offset_gy_1000dps Gyroscope Y axis offset in current full scale format.
-     * @param[in] offset_gz_1000dps Gyroscope Z axis offset in current full scale format.
-     * @param[in] offset_ax_32g Accelerometer X axis offset in current full scale format.
-     * @param[in] offset_ay_32g Accelerometer Y axis offset in current full scale format.
-     * @param[in] offset_az_32g Accelerometer Z axis offset in current full scale format.
-     * @param[in] offset_mx Magnetometer X axis hard iron distortion correction.
-     * @param[in] offset_my Magnetometer Y axis hard iron distortion correction.
-     * @param[in] offset_mz Magnetometer Z axis hard iron distortion correction.
-     * @param[in] scale_mx Magnetometer X axis soft iron distortion correction.
-     * @param[in] scale_my Magnetometer Y axis soft iron distortion correction.
-     * @param[in] scale_mz Magnetometer Z axis soft iron distortion correction.
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool init(int16_t offset_gx_1000dps, int16_t offset_gy_1000dps, int16_t offset_gz_1000dps, int16_t offset_ax_32g, int16_t offset_ay_32g, int16_t offset_az_32g, float offset_mx, float offset_my, float offset_mz, float scale_mx, float scale_my, float scale_mz);
-
-    /** Read accelerometer resolution
-     *
-     * @param[out] accelRes Accelerometer resolution in g/bit
-     *
-     */
-    void read_accelRes(float &accelRes);
-
-    /** Read accelerometer and gyroscope values
-     *
-     * @param[out] ax Accelerometer X axis value
-     * @param[out] ay Accelerometer Y axis value
-     * @param[out] az Accelerometer Z axis value
-     * @param[out] gx Gyroscope X axis value
-     * @param[out] gy Gyroscope Y axis value
-     * @param[out] gz Gyroscope Z axis value
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool read_accel_gyro(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy, int16_t &gz);
-
-    /** Read accelerometer values
-     *
-     * @param[out] ax Accelerometer X axis value
-     * @param[out] ay Accelerometer Y axis value
-     * @param[out] az Accelerometer Z axis value
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool read_accel(int16_t &ax, int16_t &ay, int16_t &az);
-    
-    /** Read gyroscope values
-     *
-     * @param[out] gx Gyroscope X axis value
-     * @param[out] gy Gyroscope Y axis value
-     * @param[out] gz Gyroscope Z axis value
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool read_gyro(int16_t &gx, int16_t &gy, int16_t &gz);
-
-    /** Read magnetometer values
-     *
-     * @param[out] mx Magnetometer X axis value
-     * @param[out] my Magnetometer Y axis value
-     * @param[out] mz Magnetometer Z axis value
-     *
-     * @return
-     *   'true' if new data,
-     *   'false' else.
-     */
-    bool read_mag(int16_t &mx, int16_t &my, int16_t &mz);
-
-    /** Read temperature value
-     *
-     * @param[out] temperature Temperature value
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool read_temperature(int16_t &temperature);
-    
-    /** Read accelerometer in g and gyroscope in deg/s
-     *
-     * @param[out] ax_g Accelerometer X axis value in g
-     * @param[out] ay_g Accelerometer Y axis value in g
-     * @param[out] az_g Accelerometer Z axis value in g
-     * @param[out] gx_dps Gyroscope X axis value in deg/s
-     * @param[out] gy_dps Gyroscope Y axis value in deg/s
-     * @param[out] gz_dps Gyroscope Z axis value in deg/s
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool read_accel_gyro_g_dps(float &ax_g, float &ay_g, float &az_g, float &gx_dps, float &gy_dps, float &gz_dps);
-    
-    /** Read accelerometer in g
-     *
-     * @param[out] ax_g Accelerometer X axis value in g
-     * @param[out] ay_g Accelerometer Y axis value in g
-     * @param[out] az_g Accelerometer Z axis value in g
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-     bool read_accel_g(float &ax_g, float &ay_g, float &az_g);
-     
-     /** read gyroscope in deg/s
-     *
-     * @param[out] gx_dps Gyroscope X axis value in deg/s
-     * @param[out] gy_dps Gyroscope Y axis value in deg/s
-     * @param[out] gz_dps Gyroscope Z axis value in deg/s
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool read_gyro_dps(float &gx_dps, float &gy_dps, float &gz_dps);
-    
-    /** Read magnetometer in uT
-     *
-     * @param[out] mx_uT Magnetometer X axis value in uT
-     * @param[out] my_uT Magnetometer Y axis value in uT
-     * @param[out] mz_uT Magnetometer Z axis value in uT
-     *
-     * @return
-     *   'true' if new data,
-     *   'false' else.
-     */
-    bool read_mag_ut(float &mx_uT, float &my_uT, float &mz_uT);
-    
-    /** Read temperature in Celsius
-     *
-     * @param [out] temperature_c Temperature value in Celsius
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool read_temperature_c(float &temperature_c);
-    
-    /** Read accelerometer values and gyroscope in rad/s
-     *
-     * @param[out] ax Accelerometer X axis value
-     * @param[out] ay Accelerometer Y axis value
-     * @param[out] az Accelerometer Z axis value
-     * @param[out] gx_rps Gyroscope X axis value in rad/s
-     * @param[out] gy_rps Gyroscope Y axis value in rad/s
-     * @param[out] gz_rps Gyroscope Z axis value in rad/s
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool read_accel_gyro_rps(int16_t &ax, int16_t &ay, int16_t &az, float &gx_rps, float &gy_rps, float &gz_rps);
-    
-    /** read gyroscope in rad/s
-     *
-     * @param[out] gx_rps Gyroscope X axis value in rad/s
-     * @param[out] gy_rps Gyroscope Y axis value in rad/s
-     * @param[out] gz_rps Gyroscope Z axis value in rad/s
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool read_gyro_rps(float &gx_rps, float &gy_rps, float &gz_rps);
-    
-    /** Reset accelerometer and gyroscope offsets to factory defaults
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool reset_accel_gyro_offsets();
-    
-    /** Accelerometer and gyroscope calibration function. Get accelerometer and
-     *  gyroscope mean values, while device is at rest and in level. Those
-     *  are then loaded into ICM20948 bias registers to remove the static 
-     *  offset error.
-     *
-     * @param[in] imuInterrupt imu interrupt flag
-     * @param[in] time_s Time period in seconds for mean value calculation
-     * @param[in] accel_tolerance_32g Maximum accelerometer mean value deviation from target value in 32g full scale format. The accelerometer
-     *            target values in x and y direction are zero and in z direction it is the acceleration due to gravity.
-     * @param[in] gyro_tolerance_1000dps Maximum gyroscope mean value deviation from zero after calibration at 1000dps full scale
-     * @param[out] offset_ax_32g Accelerometer X axis offset in current full scale format.
-     * @param[out] offset_ay_32g Accelerometer Y axis offset in current full scale format.
-     * @param[out] offset_az_32g Accelerometer Z axis offset in current full scale format.
-     * @param[out] offset_gx_1000dps Gyroscope X axis offset in current full scale format.
-     * @param[out] offset_gy_1000dps Gyroscope Y axis offset in current full scale format.
-     * @param[out] offset_gz_1000dps Gyroscope Z axis offset in current full scale format.
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool calibrate_accel_gyro(volatile bool &imuInterrupt, float time_s, int32_t accel_tolerance_32g, int32_t gyro_tolerance_1000dps, int16_t &offset_ax_32g, int16_t &offset_ay_32g, int16_t &offset_az_32g, int16_t &offset_gx_1000dps, int16_t &offset_gy_1000dps, int16_t &offset_gz_1000dps);
-    
-    /** Gyroscope calibration function. Get gyroscope mean values, while device is at rest. 
-     *  Those are then loaded into ICM20948 bias registers to remove the static offset error.
-     *
-     * @param[in] imuInterrupt imu interrupt flag
-     * @param[in] time_s Time period in seconds for mean value calculation
-     * @param[in] gyro_tolerance_1000dps Maximum gyroscope mean value deviation from zero in 1000dps full scale format
-     * @param[out] offset_gx_1000dps Gyroscope X axis offset in current full scale format.
-     * @param[out] offset_gy_1000dps Gyroscope Y axis offset in current full scale format.
-     * @param[out] offset_gz_1000dps Gyroscope Z axis offset in current full scale format.
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool calibrate_gyro(volatile bool &imuInterrupt, float time_s, int32_t gyro_tolerance_1000dps, int16_t &offset_gx_1000dps, int16_t &offset_gy_1000dps, int16_t &offset_gz_1000dps);
-    
-     /** Accelerometer calibration function. Get accelerometer mean values, while device is at rest and in level.
-     *  Those are then loaded into ICM20948 bias registers to remove the static offset error.
-     *
-     * @param[in] imuInterrupt imu interrupt flag
-     * @param[in] time_s Time period in seconds for mean value calculation
-     * @param[in] accel_tolerance_32g Maximum accelerometer mean value deviation from target value in 32g full scale format. The accelerometer
-     *            target values in x and y direction are zero and in z direction it is the acceleration due to gravity.
-     * @param[out] offset_ax_32g Accelerometer X axis offset in current full scale format.
-     * @param[out] offset_ay_32g Accelerometer Y axis offset in current full scale format.
-     * @param[out] offset_az_32g Accelerometer Z axis offset in current full scale format.
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool calibrate_accel(volatile bool &imuInterrupt, float time_s, int32_t accel_tolerance_32g, int16_t &offset_ax_32g, int16_t &offset_ay_32g, int16_t &offset_az_32g);
-    
-    /** Magnetometer calibration function. Get magnetometer minimum and maximum values, while moving 
-     *  the device in a figure eight. Those values are then used to cancel out hard and soft iron distortions.
-     *
-     * @param[in]  imuInterrupt imu interrupt flag
-     * @param[in]  time_s Time period in seconds for minimum and maximum value calculation
-     * @param[in]  mag_minimumRange Minimum range (maximum - minimum value) for all directions. 
-     *             if the range is smaller than the minimum range, the time period starts again.
-	 * @param[out] offset_mx Magnetometer X axis hard iron distortion correction.
-     * @param[out] offset_my Magnetometer Y axis hard iron distortion correction.
-     * @param[out] offset_mz Magnetometer Z axis hard iron distortion correction.
-     * @param[out] scale_mx Magnetometer X axis soft iron distortion correction.
-     * @param[out] scale_my Magnetometer Y axis soft iron distortion correction.
-     * @param[out] scale_mz Magnetometer Z axis soft iron distortion correction.
-     *
-     * @return
-     *   'true' if successful,
-     *   'false' on error.
-     */
-    bool calibrate_mag(volatile bool &imuInterrupt, float time_s, int32_t mag_minimumRange, float &offset_mx, float &offset_my, float &offset_mz, float &scale_mx, float &scale_my, float &scale_mz);
-    
-private:
-    /* Private variables */
-    float m_accelRes;
-    float m_gyroRes;
-    float m_gyroRes_rad;
-    const float m_magRes = 4912.0f / 32752.0f;    /*    Measurement range of each axis +-4912 uT is saved in 16 bit output +-32752    */
-    
-    int16_t m_g;    /*  Acceleration of gravity in LSB  */
-    
-    /* Magnetometer hard iron distortion correction */
-    float m_offset_mx = 0, m_offset_my = 0, m_offset_mz = 0;
-    /* Magnetometer soft iron distortion correction */
-    float m_scale_mx = 1, m_scale_my = 1, m_scale_mz = 1;
-    
-    /* Pure virtual functions */
-    virtual void read_register(uint16_t addr, uint8_t numBytes, uint8_t *data) = 0;
-    virtual void write_register(uint16_t addr, uint8_t data) = 0;
-    virtual void select_bank(uint8_t bank) = 0;
-    
-    void read_mag_register(uint8_t addr, uint8_t numBytes, uint8_t *data);
-    void write_mag_register(uint8_t addr, uint8_t data);
-    void set_mag_transfer(bool read);
-    
-    uint32_t reset(void);
-    uint32_t reset_mag(void);
-    uint32_t set_accel_sample_rate_div(uint16_t accelDiv);
-    uint32_t set_gyro_sample_rate_div(uint8_t gyroDiv);
-    uint32_t set_accel_bandwidth(uint8_t accelBw);
-    uint32_t set_gyro_bandwidth(uint8_t gyroBw);
-    uint32_t set_accel_fullscale(uint8_t accelFs);
-    uint32_t set_gyro_fullscale(uint8_t gyroFs);
-    uint32_t set_mag_mode(uint8_t magMode);
-    uint32_t set_accel_offsets(int16_t offset_ax, int16_t offset_ay, int16_t offset_az);
-    uint32_t set_gyro_offsets(int16_t offset_gx, int16_t offset_gy, int16_t offset_gz);
-    uint32_t get_accel_resolution(float &accelRes);
-    uint32_t get_gyro_resolution(float &gyroRes);
-    uint32_t get_accel_offsets(int16_t &offset_ax, int16_t &offset_ay, int16_t &offset_az);
-    uint32_t get_gyro_offsets(int16_t &offset_gx, int16_t &offset_gy, int16_t &offset_gz);
-    uint32_t enable_sleepmode(bool enable);
-    uint32_t enable_cyclemode(bool enable);
-    uint32_t enable_sensor(bool accel, bool gyro, bool temp);
-    uint32_t enable_lowpowermode(bool enAccel, bool enGyro, bool enTemp);
-    uint32_t enable_wake_on_motion(bool enable, uint8_t womThreshold, uint16_t accelDiv);
-    uint32_t mean_accel_gyro(volatile bool &imuInterrupt, float time_s, int16_t &mean_ax, int16_t &mean_ay, int16_t &mean_az, int16_t &mean_gx, int16_t &mean_gy, int16_t &mean_gz);
-    uint32_t min_max_mag(volatile bool &imuInterrupt, float time_s, int32_t mag_minimumRange, int16_t &min_mx, int16_t &max_mx, int16_t &min_my, int16_t &max_my, int16_t &min_mz, int16_t &max_mz);
-    uint32_t enable_irq(bool dataReadyEnable, bool womEnable);
-    uint32_t read_irqstatus(uint32_t &int_status);
-    bool is_data_ready(void);
-};
-
-class ICM20948_SPI : public ICM20948 {
-
-public:
-    /** Create an ICM20948_SPI object connected to specified SPI pins and with specified SPI settings for clock, bit order and data mode
-     *
-     * @param[in] cs_pin    SPI chip select pin.
-     * @param[in] port      SPI port.
-     * @param[in] clock     SPI clock.
-     * @param[in] bit_order SPI bit order.
-     * @param[in] data_mode SPI data mode.
-     * 
-     */
-    ICM20948_SPI(uint8_t cs_pin, SPIClass &port = SPI, uint32_t clock = 7e6, uint8_t bit_order = MSBFIRST, uint8_t data_mode = SPI_MODE3);
-    
-    /**
-     * ICM20948_SPI destructor
-     */
-    ~ICM20948_SPI(void);
-
-private:
-    /* SPI variables */
-    const uint8_t M_CS_PIN;
-    SPIClass &m_port;
-    const uint32_t M_CLOCK;
-    const uint8_t M_BIT_ORDER;
-    const uint8_t M_DATA_MODE;
-    
-    /* Private functions */
-    void read_register(uint16_t addr, uint8_t numBytes, uint8_t *data);
-    void write_register(uint16_t addr, uint8_t data);
-    void select_bank(uint8_t bank);
-};
 
 #endif
