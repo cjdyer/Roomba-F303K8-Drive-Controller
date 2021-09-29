@@ -120,15 +120,7 @@
 #define ICM_GYRO_FULLSCALE_500DPS      (0x01 << ICM_SHIFT_GYRO_FS_SEL)    /**< Gyro Full Scale = 500 deg/s  */
 #define ICM_GYRO_FULLSCALE_1000DPS     (0x02 << ICM_SHIFT_GYRO_FS_SEL)    /**< Gyro Full Scale = 1000 deg/s */
 #define ICM_GYRO_FULLSCALE_2000DPS     (0x03 << ICM_SHIFT_GYRO_FS_SEL)    /**< Gyro Full Scale = 2000 deg/s */
-#define ICM_GYRO_BW_12100HZ            (0x00 << ICM_SHIFT_GYRO_DLPCFG)                                    /**< Gyro Bandwidth = 12100 Hz */
-#define ICM_GYRO_BW_360HZ              ( (0x07 << ICM_SHIFT_GYRO_DLPCFG) | ICM_BIT_GYRO_FCHOICE)     /**< Gyro Bandwidth = 360 Hz   */
-#define ICM_GYRO_BW_200HZ              ( (0x00 << ICM_SHIFT_GYRO_DLPCFG) | ICM_BIT_GYRO_FCHOICE)     /**< Gyro Bandwidth = 200 Hz   */
-#define ICM_GYRO_BW_150HZ              ( (0x01 << ICM_SHIFT_GYRO_DLPCFG) | ICM_BIT_GYRO_FCHOICE)     /**< Gyro Bandwidth = 150 Hz   */
-#define ICM_GYRO_BW_120HZ              ( (0x02 << ICM_SHIFT_GYRO_DLPCFG) | ICM_BIT_GYRO_FCHOICE)     /**< Gyro Bandwidth = 120 Hz   */
-#define ICM_GYRO_BW_51HZ               ( (0x03 << ICM_SHIFT_GYRO_DLPCFG) | ICM_BIT_GYRO_FCHOICE)     /**< Gyro Bandwidth = 51 Hz    */
-#define ICM_GYRO_BW_24HZ               ( (0x04 << ICM_SHIFT_GYRO_DLPCFG) | ICM_BIT_GYRO_FCHOICE)     /**< Gyro Bandwidth = 24 Hz    */
-#define ICM_GYRO_BW_12HZ               ( (0x05 << ICM_SHIFT_GYRO_DLPCFG) | ICM_BIT_GYRO_FCHOICE)     /**< Gyro Bandwidth = 12 Hz    */
-#define ICM_GYRO_BW_6HZ                ( (0x06 << ICM_SHIFT_GYRO_DLPCFG) | ICM_BIT_GYRO_FCHOICE)     /**< Gyro Bandwidth = 6 Hz     */
+#define ICM_GYRO_BW_12100HZ            0x00                                    /**< Gyro Bandwidth = 12100 Hz */
 
 #define ICM_REG_GYRO_CONFIG_2          (ICM_BANK_2 | 0x02)    /**< Gyroscope Configuration 2 register                     */
 #define ICM_BIT_GYRO_CTEN              0x38                        /**< Gyroscope Self-Test Enable bits                        */
@@ -152,23 +144,10 @@
 #define ICM_REG_ACCEL_WOM_THR          (ICM_BANK_2 | 0x13)    /**< Wake-up On Motion Threshold register                   */
 
 #define ICM_REG_ACCEL_CONFIG           (ICM_BANK_2 | 0x14)    /**< Accelerometer Configuration register                   */
-#define ICM_BIT_ACCEL_FCHOICE          0x01                        /**< Accel Digital Low-Pass Filter enable bit               */
-#define ICM_SHIFT_ACCEL_FS             0x01                        /**< Accel Full Scale Select bit shift                      */
-#define ICM_SHIFT_ACCEL_DLPCFG         0x03                        /**< Accel DLPF Config bit shift                            */
-#define ICM_MASK_ACCEL_FULLSCALE       0x06                        /**< Accel Full Scale Select bit mask                       */
-#define ICM_MASK_ACCEL_BW              0x39                        /**< Accel Bandwidth Select bit mask                        */
-#define ICM_ACCEL_FULLSCALE_2G         (0x00 << ICM_SHIFT_ACCEL_FS)   /**< Accel Full Scale = 2 g     */
-#define ICM_ACCEL_FULLSCALE_4G         (0x01 << ICM_SHIFT_ACCEL_FS)   /**< Accel Full Scale = 4 g     */
-#define ICM_ACCEL_FULLSCALE_8G         (0x02 << ICM_SHIFT_ACCEL_FS)   /**< Accel Full Scale = 8 g     */
-#define ICM_ACCEL_FULLSCALE_16G        (0x03 << ICM_SHIFT_ACCEL_FS)   /**< Accel Full Scale = 16 g    */
-#define ICM_ACCEL_BW_1210HZ            (0x00 << ICM_SHIFT_ACCEL_DLPCFG)                                    /**< Accel Bandwidth = 1210 Hz  */
-#define ICM_ACCEL_BW_470HZ             ( (0x07 << ICM_SHIFT_ACCEL_DLPCFG) | ICM_BIT_ACCEL_FCHOICE)    /**< Accel Bandwidth = 470 Hz   */
-#define ICM_ACCEL_BW_246HZ             ( (0x00 << ICM_SHIFT_ACCEL_DLPCFG) | ICM_BIT_ACCEL_FCHOICE)    /**< Accel Bandwidth = 246 Hz   */
-#define ICM_ACCEL_BW_111HZ             ( (0x02 << ICM_SHIFT_ACCEL_DLPCFG) | ICM_BIT_ACCEL_FCHOICE)    /**< Accel Bandwidth = 111 Hz   */
-#define ICM_ACCEL_BW_50HZ              ( (0x03 << ICM_SHIFT_ACCEL_DLPCFG) | ICM_BIT_ACCEL_FCHOICE)    /**< Accel Bandwidth = 50 Hz    */
-#define ICM_ACCEL_BW_24HZ              ( (0x04 << ICM_SHIFT_ACCEL_DLPCFG) | ICM_BIT_ACCEL_FCHOICE)    /**< Accel Bandwidth = 24 Hz    */
-#define ICM_ACCEL_BW_12HZ              ( (0x05 << ICM_SHIFT_ACCEL_DLPCFG) | ICM_BIT_ACCEL_FCHOICE)    /**< Accel Bandwidth = 12 Hz    */
-#define ICM_ACCEL_BW_6HZ               0x31    /**< Accel Bandwidth = 6 Hz     */
+#define ICM_ACCEL_FULLSCALE_8G         0x04    /**< Accel Full Scale = 8 g            */
+#define ICM_ACCEL_FULLSCALE_16G        0x06    /**< Accel Full Scale = 8 g            */
+#define ICM_ACCEL_BW_6HZ               0x30    /**< Accel Bandwidth = 6 Hz            */
+#define ICM_ACCEL_ENABLE_DLPF          0x01    /**< Accel enable Data low pass filter */
 
 #define ICM_REG_ACCEL_CONFIG_2         (ICM_BANK_2 | 0x15)    /**< Accelerometer Configuration 2 register             */
 #define ICM_BIT_ACCEL_CTEN             0x1C                        /**< Accelerometer Self-Test Enable bits                */

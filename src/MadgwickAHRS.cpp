@@ -234,8 +234,3 @@ float MADGWICK_AHRS::invSqrt(float x) {
 	
 	return conv.f;
 }
-
-void accelAngles(float& roll_angle_accel, float& pitch_angle_accel) {
-	roll_angle_accel = atan2(ay, az) * RAD2DEG;
-	pitch_angle_accel = atan2(-ax, sqrt(pow(ay, 2) + pow(az, 2))) * RAD2DEG;
-}

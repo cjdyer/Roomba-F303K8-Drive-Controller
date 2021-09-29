@@ -20,8 +20,8 @@ double PID::calculate(int32_t _sensor_value)
     integral_ += error_ * time_difference;
 
     //Calculate integral_ (If conditions are met).
-    integral_ = (abs(integral_) > integral_limit_) ? integral_limit_ * sgn(integral_) : integral_;
-    if ((sgn(integral_) != sgn(error_) || abs(error_) > 500)) integral_ = 0;
+    integral_ = (abs(integral_) > integral_limit_) * (integral_limit_ * sgn(integral_)) + (abs(integral_) < integral_limit_) * integral_;
+    integral_ = !((sgn(integral_) != sgn(error_) || abs(error_) > 500)) * integral_;
 
     derivative_ = ((_sensor_value - last_sensor_value_) / time_difference) * derivative_gain_ + last_derivative_ * (1 - derivative_gain_); // Derivative filtering
 
