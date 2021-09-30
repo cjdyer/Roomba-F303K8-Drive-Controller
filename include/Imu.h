@@ -1,8 +1,8 @@
-#ifndef CUSTOM_IMU_H
-#define CUSTOM_IMU_H
+#ifndef IMU_H
+#define IMU_H
 
 #include <Arduino.h>
-#include <SPI.h>
+#include "utility/spi_com.h"
 
 class IMU
 {
@@ -18,7 +18,7 @@ private:
     void select_bank(uint8_t bank);
 
     void transfer(uint8_t data);
-    void transfer(uint16_t *_data, const uint8_t _number_bytes);
+    void transfer(void *_data, const uint8_t _number_bytes);
 
     void calibrate(const float time_s);
 
@@ -33,6 +33,7 @@ private:
     void read_accel_gyro(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy, int16_t &gz);
 
     static constexpr uint8_t M_CS_PIN = 10;
+    spi_t _spi;
 
     // gyro resolution in Radians
     // 3.28 LSB/dps - from datasheet

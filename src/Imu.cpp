@@ -1,21 +1,27 @@
-#include "custom_imu.h"
-#include "alt_IMU_REGS.h"
+#include "Imu.h"
+#include "imu_registers.h"
 
 IMU::IMU()
 {
     pinMode(M_CS_PIN, OUTPUT);
     digitalWrite(M_CS_PIN, HIGH);
+
+    _spi.pin_miso = digitalPinToPinName(MISO); // Configure spi pins 
+    _spi.pin_mosi = digitalPinToPinName(MOSI);
+    _spi.pin_sclk = digitalPinToPinName(SCK);
+    _spi.pin_ssel = NC;
 }
 
 void IMU::begin()
 {
-    SPI.begin();
+    spi_init(&_spi, 7e6, SPI_MODE_3, MSBFIRST); // Begin SPI
+
     write_register(IMU_REG_PWR_MGMT_1, IMU_BIT_CLK_PLL | IMU_BIT_TEMP_DIS); // Enable clock, disable sleep and disable temp sensor
     delay(30);                                                              // Accelerometer start time
     write_register(IMU_REG_USER_CTRL, IMU_BIT_I2C_IF_DIS);                  // Enable SPI - Disable I2C
 
-    write_register(IMU_REG_ACCEL_CONFIG, IMU_ACCEL_FULLSCALE_16G | IMU_ACCEL_ENABLE_DLPF | IMU_ACCEL_BW_6HZ); // Configure Accel
-    write_register(IMU_REG_GYRO_CONFIG_1, IMU_GYRO_BW_12100HZ | IMU_GYRO_FULLSCALE_1000DPS);                  // Configure Gyro
+    write_register(IMU_REG_ACCEL_CONFIG, IMU_ACCEL_FULLSCALE_16G | IMU_ACCEL_ENABLE_DLPF | IMU_ACCEL_BW_6HZ);       // Configure Accel
+    write_register(IMU_REG_GYRO_CONFIG_1, IMU_GYRO_FULLSCALE_1000DPS | IMU_BIT_GYRO_FCHOICE | IMU_GYRO_BW_12100HZ); // Configure Gyro
 
     // high time = more risk of over calibration
     // low time = more risk of random correlation and worse drift
@@ -39,7 +45,7 @@ void IMU::read_register(const uint16_t _address, const uint8_t _number_bytes, ui
 
     digitalWrite(M_CS_PIN, LOW);
     transfer(_address | ~IMU_REG_BANK_SEL);
-    SPI.transfer(_data, _number_bytes);
+    transfer(_data, _number_bytes);
     digitalWrite(M_CS_PIN, HIGH);
 }
 
@@ -55,12 +61,12 @@ void IMU::write_register(const uint16_t _address, const uint8_t _data)
 
 void IMU::transfer(uint8_t _data)
 {
-    spi_transfer(&SPI._spi, &_data, &_data, 1, 1000, false);
+    spi_transfer(&_spi, &_data, &_data, 1, 1000, false);
 }
 
-void IMU::transfer(uint16_t *_data, const uint8_t _number_bytes)
+void IMU::transfer(void *_data, const uint8_t _number_bytes)
 {
-    spi_transfer(&SPI._spi, ((uint8_t *)_data), ((uint8_t *)_data), 1, 1000, false);
+    spi_transfer(&_spi, ((uint8_t *)_data), ((uint8_t *)_data), _number_bytes, 1000, false);
 }
 
 void IMU::select_bank(const uint8_t _bank)

@@ -1,5 +1,5 @@
-#ifndef ALT_IMU_REGS_H
-#define ALT_IMU_REGS_H
+#ifndef IMU_REGISTERS_H
+#define IMU_REGISTERS_H
 
 #define IMU_BANK_0                     (0 << 7)                    /**< Register bank 0    */
 #define IMU_BANK_1                     (1 << 7)                    /**< Register bank 1    */
