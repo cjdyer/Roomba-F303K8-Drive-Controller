@@ -12,7 +12,6 @@ float dt_s;
 
 int16_t ax, ay, az;
 float gx_rps, gy_rps, gz_rps;
-int16_t mx, my, mz;
 
 float roll_angle, pitch_angle, yaw_angle;	// euler angles
 float roll_angle_accel, pitch_angle_accel;
@@ -21,7 +20,7 @@ bool init_set = false;
 bool beta_settled = false;
 float yaw_angle_init = -1000;
 
-ICM imu;
+IMU imu;
 MADGWICK_AHRS madgwickFilter(BETA_INIT);
 
 void accelAngles(float& roll_angle_accel, float& pitch_angle_accel);
@@ -31,8 +30,7 @@ void setup()
     Serial.begin(115200);
     while (!Serial);
 
-    SPI.begin();
-    imu.init();
+    imu.begin();
 }
 
 void loop()
@@ -49,7 +47,6 @@ void loop()
 
 	// TODO: Check if there is a benefit from magnetometer data
 	madgwickFilter.get_euler_quaternion(dt_s, ax, ay, az, gx_rps, gy_rps, gz_rps, 0, 0, 0, roll_angle, pitch_angle, yaw_angle);
-
 
     if (!beta_settled)
     {
