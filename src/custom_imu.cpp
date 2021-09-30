@@ -11,15 +11,20 @@ ICM::ICM() : m_port(SPI), spi_settings(SPISettings(7000000, MSBFIRST, SPI_MODE3)
 
 void ICM::init()
 {
+    uint8_t data[1];
     write_register(ICM_REG_PWR_MGMT_1, ICM_BIT_CLK_PLL | ICM_BIT_TEMP_DIS); // Enable clock, disable sleep and disable temp sensor
     delay(30); // Accelerometer start time
     write_register(ICM_REG_USER_CTRL, ICM_BIT_I2C_IF_DIS); // Enable SPI - Disable I2C
     write_register(ICM_REG_ACCEL_CONFIG, ICM_ACCEL_FULLSCALE_16G | ICM_ACCEL_ENABLE_DLPF | ICM_ACCEL_BW_6HZ); // Configure Accel
     write_register(ICM_REG_GYRO_CONFIG_1, ICM_GYRO_BW_12100HZ | ICM_GYRO_FULLSCALE_1000DPS); // Configure Gyro
 
+    write_mag_register(AK09916_REG_CONTROL_2, AK09916_MODE_100HZ);
+    read_mag_register(AK09916_REG_STATUS_2, 1, data);
+
     // high time = more risk of over calibration  
     // low time = more risk of random correlation and worse drift
     calibrate(0.5); // Open to change in this time  
+    calibrate_mag(5.0);
 }
 
 void ICM::read_accel_gyro_rps(int16_t &_accel_x, int16_t &_accel_y, int16_t &_accel_z, float &_gyro_rps_x, float &_gyro_rps_y, float &_gyro_rps_z) 
@@ -31,6 +36,20 @@ void ICM::read_accel_gyro_rps(int16_t &_accel_x, int16_t &_accel_y, int16_t &_ac
     _gyro_rps_x = (float) _gyro_x * m_gyroRes_rad;
     _gyro_rps_y = (float) _gyro_y * m_gyroRes_rad;
     _gyro_rps_z = (float) _gyro_z * m_gyroRes_rad;
+}
+
+bool ICM::read_mag_ut(float &mag_x_ut, float &mag_y_ut, float &mag_z_ut) {
+    static int16_t mx, my, mz;
+    static bool new_mag;
+    
+    new_mag = read_mag(mx, my, mz);
+    
+    /* Multiply the values with the resolution to transform them into uT */
+    mag_x_ut = (float) mx * m_magRes;
+    mag_y_ut = (float) my * m_magRes;
+    mag_z_ut = (float) mz * m_magRes;
+
+    return new_mag;
 }
 
 void ICM::write_register(const uint16_t _address, const uint8_t _data) 
@@ -130,6 +149,86 @@ void ICM::calibrate(const float _time) // Might rewite this
     }
 }
 
+bool ICM::calibrate_mag(float time_s, int32_t mag_minimumRange, float &offset_mx, float &offset_my, float &offset_mz, float &scale_mx, float &scale_my, float &scale_mz) {
+    int16_t min_mx, max_mx, min_my, max_my, min_mz, max_mz;
+    int32_t sum_mx, sum_my, sum_mz;
+    int32_t dif_mx, dif_my, dif_mz, dif_m;
+
+    m_offset_mx = 0; m_offset_my = 0; m_offset_mz = 0;
+    m_scale_mx = 1; m_scale_my = 1; m_scale_mz = 1;
+    
+    min_max_mag(time_s, mag_minimumRange, min_mx, max_mx, min_my, max_my, min_mz, max_mz);
+    
+    sum_mx = (int32_t) max_mx + min_mx;
+    sum_my = (int32_t) max_my + min_my;
+    sum_mz = (int32_t) max_mz + min_mz;
+    
+    dif_mx = (int32_t) max_mx - min_mx;
+    dif_my = (int32_t) max_my - min_my;
+    dif_mz = (int32_t) max_mz - min_mz;
+    
+    offset_mx = -0.5f * sum_mx;
+    offset_my = -0.5f * sum_my;
+    offset_mz = -0.5f * sum_mz;
+    
+    dif_m = (dif_mx + dif_my + dif_mz) / 3;
+    
+    scale_mx = (float) dif_m / dif_mx;
+    scale_my = (float) dif_m / dif_my;
+    scale_mz = (float) dif_m / dif_mz;
+    
+    /* Apply calibration result. */
+    m_offset_mx = offset_mx; m_offset_my = offset_my; m_offset_mz = offset_mz;
+    m_scale_mx = scale_mx; m_scale_my = scale_my; m_scale_mz = scale_mz;
+    
+    return true;
+}   
+
+void ICM::min_max_mag(float time_s, int32_t mag_minimumRange, int16_t &min_mx, int16_t &max_mx, int16_t &min_my, int16_t &max_my, int16_t &min_mz, int16_t &max_mz) {
+    int16_t mx, my, mz;
+    
+    min_mx = 32767; min_my = 32767; min_mz = 32767;
+    max_mx = -32768; max_my = -32768; max_mz = -32768;
+    
+    bool new_mag;
+    
+    const uint32_t time = time_s * 1e6;
+    
+    bool miniumRange_mx = false;
+    bool miniumRange_my = false;
+    bool miniumRange_mz = false;
+    
+    while (!miniumRange_mx || !miniumRange_my || !miniumRange_mz) 
+    {
+        uint32_t t_start = micros();
+        while ((micros() - t_start) < time)  
+        {
+            new_mag = read_mag(mx, my, mz);
+            
+            if (new_mag) {
+                if (mx < min_mx)
+                    min_mx = mx;      
+                else if (mx > max_mx)
+                    max_mx = mx;
+                
+                if (my < min_my)
+                    min_my = my;
+                else if (my > max_my)
+                    max_my = my;
+                
+                if (mz < min_mz) 
+                    min_mz = mz;
+                else if (mz > max_mz)
+                    max_mz = mz;
+                
+                miniumRange_mx = (max_mx - min_mx) > mag_minimumRange;
+                miniumRange_my = (max_my - min_my) > mag_minimumRange;
+                miniumRange_mz = (max_mz - min_mz) > mag_minimumRange;
+            }
+        }
+    }
+}
+
 void ICM::mean_accel_gyro(const float _calibration_time, int16_t &_mean_accel_x, int16_t &_mean_accel_y, int16_t &_mean_accel_z, int16_t &_mean_gyro_x, int16_t &_mean_gyro_y, int16_t &_mean_gyro_z) 
 {
     static int32_t sum_accel_x, sum_accel_y, sum_accel_z, sum_gyro_x, sum_gyro_y, sum_gyro_z;
@@ -173,6 +272,128 @@ void ICM::read_accel_gyro(int16_t &_accel_x, int16_t &_accel_y, int16_t &_accel_
     _gyro_z =  data[10] << 8 | data[11];
 }
 
+bool ICM::read_mag(int16_t &mx, int16_t &my, int16_t &mz) {
+    static uint8_t status = 0;
+    static uint32_t t_start;
+    static uint8_t data[6];
+    
+    switch (status) {
+        case 0:     /* Request AK09916C status_1 */
+            /* Set ICM20948 SLV0_REG to AK09916C status_1 address */
+            write_register(ICM_REG_I2C_SLV0_REG, AK09916_REG_STATUS_1);
+            /* Request AK09916C status_1 */
+            write_register(ICM_REG_I2C_SLV0_CTRL, ICM_BIT_I2C_SLV_EN | 1);
+        
+            t_start = micros();
+            status = 1;
+            break;
+        case 1:     /* Read AK09916C status_1 from ICM20948 to check if data is ready */
+            /* Wait for ICM20948 registers to fill with AK09916C status_1 data */
+            if ((micros() - t_start) > 1000) {
+                /* Read AK09916C status_1 from ICM20948 EXT_SLV_SENS_DATA registers */
+                read_register(ICM_REG_EXT_SLV_SENS_DATA_00, 1, data);
+                
+                /* Check AK09916C status_1 for data ready */
+                if ((data[0] & AK09916_BIT_DRDY) == AK09916_BIT_DRDY) {
+                    t_start = micros();
+                    status = 2;
+                }
+            }
+            break;
+        case 2:     /* Request AK09916C measurement data */
+            /* Set ICM20948 SLV0_REG to AK09916C measurement data address */
+            write_register(ICM_REG_I2C_SLV0_REG, AK09916_REG_HXL);
+            /* Request AK09916C measurement data */
+            write_register(ICM_REG_I2C_SLV0_CTRL, ICM_BIT_I2C_SLV_EN | 6);
+            
+            t_start = micros();
+            status = 3;
+            break;
+        case 3:     /* Read AK09916C measurement data from ICM20948 */
+            /* Wait for ICM20948 registers to fill with AK09916C measurement data */
+            if ((micros() - t_start) > 1000) {
+                /* Read AK09916C measurement data from ICM20948 EXT_SLV_SENS_DATA registers */
+                read_register(ICM_REG_EXT_SLV_SENS_DATA_00, 6, data);
+                
+                /* Convert the LSB and MSB into a signed 16-bit value */
+                mx = ((int16_t) data[1] << 8) | data[0];
+                my = ((int16_t) data[3] << 8) | data[2];
+                mz = ((int16_t) data[5] << 8) | data[4];
+                
+                /* Transform magnetometer values to match the coordinate system of accelerometer and gyroscope */
+                my = -my;
+                mz = -mz;                
+                
+                /* Apply hard and soft iron distortion correction */
+                mx = ((mx + m_offset_mx) * m_scale_mx) + 0.5;
+                my = ((my + m_offset_my) * m_scale_my) + 0.5;
+                mz = ((mz + m_offset_mz) * m_scale_mz) + 0.5;
+                
+                status = 4;
+                return true;
+            }
+            break;
+        case 4:    /* Request AK09916C status_2 to indicate that data is read and allow AK09916C to update the measurement data */
+            /* Set ICM20948 SLV0_REG to AK09916C status_2 address */
+            write_register(ICM_REG_I2C_SLV0_REG, AK09916_REG_STATUS_2);
+            /* Request AK09916C status_1 */
+            write_register(ICM_REG_I2C_SLV0_CTRL, ICM_BIT_I2C_SLV_EN | 1);
+            
+            t_start = micros();
+            status = 5;
+            break;
+        case 5:     /* Wait for AK09916C status_2 request from ICM20948 */
+            if ((micros() - t_start) > 1000) {
+                status = 0;
+            }
+            break;           
+        default:
+            status = 0;
+            break;
+    }
+    
+    return false;
+}
+
+
+void ICM::set_mag_transfer(bool read) 
+{
+    static const uint8_t MAG_BIT_READ   = AK09916_BIT_I2C_SLV_ADDR | ICM_BIT_I2C_SLV_READ;
+    static const uint8_t MAG_BIT_WRITE  = AK09916_BIT_I2C_SLV_ADDR;
+
+    static bool read_old = !read;
+
+    if (read != read_old) {   
+        if (read) {
+            write_register(ICM_REG_I2C_SLV0_ADDR, MAG_BIT_READ);
+        }
+        else {
+            write_register(ICM_REG_I2C_SLV0_ADDR, MAG_BIT_WRITE);
+        }
+        read_old = read;
+    }
+}
+
+void ICM::read_mag_register(uint8_t addr, uint8_t numBytes, uint8_t *data) 
+{
+    set_mag_transfer(true);
+
+    write_register(ICM_REG_I2C_SLV0_REG, addr);
+    write_register(ICM_REG_I2C_SLV0_CTRL, ICM_BIT_I2C_SLV_EN | numBytes);
+    delay(10);
+    read_register(ICM_REG_EXT_SLV_SENS_DATA_00, numBytes, data); 
+}
+
+void ICM::write_mag_register(uint8_t addr, uint8_t data) 
+{
+    set_mag_transfer(false);
+
+    write_register(ICM_REG_I2C_SLV0_REG, addr);
+    write_register(ICM_REG_I2C_SLV0_DO, data);
+    write_register(ICM_REG_I2C_SLV0_CTRL, ICM_BIT_I2C_SLV_EN | 0x01);
+    delay(10);
+
+}
 void ICM::get_accel_offsets(int16_t &_accel_offset_x, int16_t &_accel_offset_y, int16_t &_accel_offset_z) 
 {
     uint8_t data[8]; // 8 addresses, 3 per Accel axis [MSB, LSB,  blank] (9th doesnt need to be read)

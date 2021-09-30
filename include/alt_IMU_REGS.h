@@ -201,4 +201,38 @@
 
 #define ICM_DEVICE_ID                  0xEA                        /**< Device ID value                                    */
 
+/*****************************/
+/* AK09916 register map */
+/*****************************/
+#define AK09916_REG_WHO_AM_I                0x01                        /**< AK09916 Device ID register             */
+#define AK09916_DEVICE_ID                   0x09                        /**< AK09916 Device ID value                */
+
+#define AK09916_REG_STATUS_1                0x10                        /**< Status 1 register                      */
+#define AK09916_BIT_DRDY                    0x01                        /**< Data Ready bit                         */
+#define AK09916_BIT_DOR                     0x02                        /**< Data Overrun bit                       */
+
+#define AK09916_REG_HXL                     0x11                        /**< Magnetometer X-axis data lower byte    */
+#define AK09916_REG_HXH                     0x12                        /**< Magnetometer X-axis data higher byte   */
+#define AK09916_REG_HYL                     0x13                        /**< Magnetometer Y-axis data lower byte    */
+#define AK09916_REG_HYH                     0x14                        /**< Magnetometer Y-axis data higher byte   */
+#define AK09916_REG_HZL                     0x15                        /**< Magnetometer Z-axis data lower byte    */
+#define AK09916_REG_HZH                     0x16                        /**< Magnetometer Z-axis data higher byte   */
+
+#define AK09916_REG_STATUS_2                0x18                        /**< Status 2 register                      */
+
+#define AK09916_REG_CONTROL_2               0x31                        /**< Control 2 register                     */
+#define AK09916_BIT_MODE_POWER_DOWN         0x00                        /**< Power-down                             */
+#define AK09916_MODE_SINGLE                 0x01                        /**< Magnetometer takes one measurement     */
+#define AK09916_MODE_10HZ                   0x02                        /**< Magnetometer Measurement Rate = 10HZ   */
+#define AK09916_MODE_20HZ                   0x04                        /**< Magnetometer Measurement Rate = 20HZ   */
+#define AK09916_MODE_50HZ                   0x06                        /**< Magnetometer Measurement Rate = 50HZ   */
+#define AK09916_MODE_100HZ                  0x08                        /**< Magnetometer Measurement Rate = 100HZ  */
+#define AK09916_MODE_ST                     0x16                        /**< Self-test                              */
+
+#define AK09916_REG_CONTROL_3               0x32                        /**< Control 3 register                     */
+#define AK09916_BIT_SRST                    0x01                        /**< Soft Reset bit                         */
+
+#define AK09916_REG_WHO_AM_I                0x01                        /**< AK09916 Device ID register             */
+#define AK09916_BIT_I2C_SLV_ADDR            0x0C                        /**< AK09916 I2C Slave Address              */
+
 #endif
