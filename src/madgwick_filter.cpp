@@ -6,7 +6,7 @@
 const float RAD2DEG = (float) 4068 / 71;
 
 // get pose in euler angles and quaternion form
-void velocity_to_angles(const float dt_s, const float __beta, const float ax, const float ay, const float az, const float gx, const float gy, const float gz, float &angle_x, float &angle_y, float &angle_z) {
+void velocity_to_angles(const float dt_s, const float _beta, float ax, float ay, float az, const float gx, const float gy, const float gz, float &angle_x, float &angle_y, float &angle_z) {
     static float recipNorm;
 	static float s0, s1, s2, s3;
 	static float qDot1, qDot2, qDot3, qDot4;
