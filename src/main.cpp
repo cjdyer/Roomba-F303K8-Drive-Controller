@@ -1,18 +1,19 @@
 #include "Imu.h"
-#include "MadgwickAHRS.h"
+#include "madgwick_filter.h"
 
 uint32_t t, dt, t0;
 float dt_s;
 
-int16_t ax, ay, az;
-float gx_rps, gy_rps, gz_rps;
-float roll_angle, pitch_angle, yaw_angle, roll_angle_accel, pitch_angle_accel;
+float ax, ay, az, gx_rps, gy_rps, gz_rps;
+float roll_angle, pitch_angle, yaw_angle, roll_angle_accel, pitch_angle_accel, initial_heading;
 
 uint8_t gyro_iterations = 0;
-float yaw_init;
 
 IMU imu;
-MADGWICK_AHRS madgwickFilter(10);
+// Beta initial value - 2.5 to ensure convergence of algorithm states
+// Set Beta to a lower value after 10 seconds  
+// 0.033 ideal dynamic performance | 0.01 Ideal static performance
+float beta = 2.5;
 
 void setup()
 {
@@ -32,32 +33,34 @@ void loop()
 	// read accel and gyro measurements
 	imu.read_accel_gyro_rps(ax, ay, az, gx_rps, gy_rps, gz_rps);
 
-	madgwickFilter.get_euler_quaternion(dt_s, ax, ay, az, gx_rps, gy_rps, gz_rps, 0, 0, 0, roll_angle, pitch_angle, yaw_angle);
+	velocity_to_angles(dt_s, beta, ax, ay, az, gx_rps, gy_rps, gz_rps, roll_angle, pitch_angle, yaw_angle);
 
     static uint32_t timer_500ms = millis();
     if (millis() - timer_500ms > 500) 
     {
         timer_500ms = millis();
 
-        if (gyro_iterations > 21)
+        // if (gyro_iterations > 21)
+        // {
+        //     Serial.print("Roll :  ");
+        //     Serial.print(roll_angle, 5);  
+        //     Serial.print("  Pitch :  ");
+        //     Serial.print(pitch_angle, 5);  
+        //     Serial.print("  Yaw :  ");
+        //     Serial.println(yaw_angle - initial_heading, 5);
+        // }
+        if (gyro_iterations <= 20) // Wonky but legit logic
         {
-            Serial.print("Roll :  ");
-            Serial.print(roll_angle, 5);  
-            Serial.print("  Pitch :  ");
-            Serial.print(pitch_angle, 5);  
-            Serial.print("  Yaw :  ");
-            Serial.println(yaw_angle - yaw_init, 5);
-        }
-        else if (gyro_iterations > 20)
-        {
-            madgwickFilter.set_beta(0.033);
-            yaw_init = yaw_angle;
-            Serial.println("Gyro Ready");
-            gyro_iterations++;
-        }
-        else 
-        {
-            gyro_iterations++;
+            if (gyro_iterations == 20)
+            {
+                beta = 0.033; 
+                initial_heading = yaw_angle; // After Madgwick filter is in steady-state set heading.
+                gyro_iterations++;
+            }
+            else 
+            {
+                gyro_iterations++;
+            }
         }
     }
 }

@@ -17,26 +17,30 @@ void IMU::begin()
     spi_init(&_spi, 7e6, SPI_MODE_3, MSBFIRST); // Begin SPI
 
     write_register(IMU_REG_PWR_MGMT_1, IMU_BIT_CLK_PLL | IMU_BIT_TEMP_DIS); // Enable clock, disable sleep and disable temp sensor
-    delay(30);                                                              // Accelerometer start time
     write_register(IMU_REG_USER_CTRL, IMU_BIT_I2C_IF_DIS);                  // Enable SPI - Disable I2C
-
+    delay(30);                                                              // Clock PLL start time ( Soft accel start time - average 10ms )
     write_register(IMU_REG_ACCEL_CONFIG, IMU_ACCEL_FULLSCALE_16G | IMU_ACCEL_ENABLE_DLPF | IMU_ACCEL_BW_6HZ);       // Configure Accel
-    write_register(IMU_REG_GYRO_CONFIG_1, IMU_GYRO_FULLSCALE_1000DPS | IMU_BIT_GYRO_FCHOICE | IMU_GYRO_BW_12100HZ); // Configure Gyro
+    write_register(IMU_REG_GYRO_CONFIG_1, IMU_GYRO_FULLSCALE_1000DPS | IMU_BIT_GYRO_FCHOICE | IMU_GYRO_BW_12100HZ); // Configure Gyro                                                              // Accelerometer start time
 
     // high time = more risk of over calibration
     // low time = more risk of random correlation and worse drift
     calibrate(0.5); // Open to change in this time
 }
 
-void IMU::read_accel_gyro_rps(int16_t &_accel_x, int16_t &_accel_y, int16_t &_accel_z, float &_gyro_rps_x, float &_gyro_rps_y, float &_gyro_rps_z)
+void IMU::read_accel_gyro_rps(float &_accel_x, float &_accel_y, float &_accel_z, float &_gyro_rps_x, float &_gyro_rps_y, float &_gyro_rps_z)
 {
-    static int16_t _gyro_x, _gyro_y, _gyro_z;
+    static int16_t gyro_x, gyro_y, gyro_z;
+    static int16_t accel_x, accel_y, accel_z;
 
-    read_accel_gyro(_accel_x, _accel_y, _accel_z, _gyro_x, _gyro_y, _gyro_z);
+    read_accel_gyro(accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z);
 
-    _gyro_rps_x = (float)_gyro_x * m_gyroRes; // Convert from degrees to radians and
-    _gyro_rps_y = (float)_gyro_y * m_gyroRes; // scale dps simplified to one constant
-    _gyro_rps_z = (float)_gyro_z * m_gyroRes;
+
+    _accel_x    = (float)accel_x * m_accelRes;
+    _accel_y    = (float)accel_y * m_accelRes;
+    _accel_z    = (float)accel_z * m_accelRes;
+    _gyro_rps_x = (float)gyro_x * m_gyroRes; // Convert from degrees to radians and
+    _gyro_rps_y = (float)gyro_y * m_gyroRes; // scale dps simplified to one constant
+    _gyro_rps_z = (float)gyro_z * m_gyroRes;
 }
 
 void IMU::read_register(const uint16_t _address, const uint8_t _number_bytes, uint8_t *_data)
@@ -86,7 +90,7 @@ void IMU::select_bank(const uint8_t _bank)
 
 void IMU::calibrate(const float _time) // Might rewite this
 {
-    constexpr float accel_offset_scale = 0.5f;           // 16g / 32g = 0.25
+    constexpr float accel_offset_scale = 0.5f;           // 16g / 32g = 0.5
     constexpr uint8_t accel_offset_scale_reciprocal = 2; // Faster to multiply than to divide
 
     constexpr uint8_t accel_tolerance = 8;
@@ -162,7 +166,7 @@ void IMU::mean_accel_gyro(const float _calibration_time, int16_t &_mean_accel_x,
 
     _mean_accel_x = sum_accel_x / iterations;
     _mean_accel_y = sum_accel_y / iterations;
-    _mean_accel_z = (sum_accel_z / iterations) - 4096; // gravity offset 0x1000
+    _mean_accel_z = (sum_accel_z / iterations) - 2048; // gravity offset 0x100
     _mean_gyro_x = sum_gyro_x / iterations;
     _mean_gyro_y = sum_gyro_y / iterations;
     _mean_gyro_z = sum_gyro_z / iterations;

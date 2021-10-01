@@ -10,7 +10,7 @@ public:
     IMU();
 
     void begin();
-    void read_accel_gyro_rps(int16_t &_accel_x, int16_t &_accel_y, int16_t &_accel_z, float &_gyro_rps_x, float &_gyro_rps_y, float &_gyro_rps_z);
+    void read_accel_gyro_rps(float &_accel_x, float &_accel_y, float &_accel_z, float &_gyro_rps_x, float &_gyro_rps_y, float &_gyro_rps_z);
 
 private:
     void read_register(const uint16_t _address, const uint8_t _number_bytes, uint8_t *_data);
@@ -40,6 +40,7 @@ private:
     // 1000 dps     - set by user
     // 4068 / 71    - Radians to degrees approx.
     static constexpr float m_gyroRes = 355.0f / 667152.0f; // (1000 / 32800)  / (4068 / 71) 
+    static constexpr float m_accelRes = 16.0f / 32768.0f;
 };
 
 #endif
