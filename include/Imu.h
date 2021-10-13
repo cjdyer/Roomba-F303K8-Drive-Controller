@@ -15,32 +15,31 @@ public:
 private:
     void read_register(const uint16_t _address, const uint8_t _number_bytes, uint8_t *_data);
     void write_register(const uint16_t _address, const uint8_t _data);
-    void select_bank(uint8_t bank);
+    void select_bank(uint8_t _bank);
 
-    void transfer(uint8_t data);
+    void transfer(uint8_t _data);
     void transfer(void *_data, const uint8_t _number_bytes);
 
-    void calibrate(const float time_s);
+    void calibrate(const float _time_s);
 
-    void get_gyro_offsets(int16_t &offset_gx, int16_t &offset_gy, int16_t &offset_gz);
-    void set_gyro_offsets(int16_t offset_gx, int16_t offset_gy, int16_t offset_gz);
+    void get_gyro_offsets(int16_t &_gyro_offset_x, int16_t &_gyro_offset_y, int16_t &_gyro_offset_z);
+    void set_gyro_offsets(int16_t _gyro_offset_x, int16_t _gyro_offset_y, int16_t _gyro_offset_z);
 
-    void get_accel_offsets(int16_t &offset_ax, int16_t &offset_ay, int16_t &offset_az);
-    void set_accel_offsets(int16_t offset_ax, int16_t offset_ay, int16_t offset_az);
+    void get_accel_offsets(int16_t &_accel_offset_x, int16_t &_accel_offset_y, int16_t &_accel_offset_z);
+    void set_accel_offsets(int16_t _accel_offset_x, int16_t _accel_offset_y, int16_t _accel_offset_z);
 
+    void mean_accel_gyro(const float _calibration_time, int16_t &_mean_accel_x, int16_t &_mean_accel_y, int16_t &_mean_accel_z, int16_t &_mean_gyro_x, int16_t &_mean_gyro_y, int16_t &_mean_gyro_z);
+    void read_accel_gyro(int16_t &_accel_x, int16_t &_accel_y, int16_t &_accel_z, int16_t &_gyro_x, int16_t &_gyro_y, int16_t &_gyro_z);
 
-    void mean_accel_gyro(const float time_s, int16_t &mean_ax, int16_t &mean_ay, int16_t &mean_az, int16_t &mean_gx, int16_t &mean_gy, int16_t &mean_gz);
-    void read_accel_gyro(int16_t &ax, int16_t &ay, int16_t &az, int16_t &gx, int16_t &gy, int16_t &gz);
-
-    static constexpr uint8_t M_CS_PIN = 10;
+    static constexpr uint8_t cs_pin_ = 10;
     spi_t _spi;
 
     // gyro resolution in Radians
     // 3.28 LSB/dps - from datasheet
     // 1000 dps     - set by user
     // 4068 / 71    - Radians to degrees approx.
-    static constexpr float m_gyroRes = 355.0f / 667152.0f; // (1000 / 32800)  / (4068 / 71) 
-    static constexpr float m_accelRes = 16.0f / 32768.0f;
+    static constexpr float gyro_res_ = 355.0f / 667152.0f; // (1000 / 32800)  / (4068 / 71) 
+    static constexpr float accel_res_ = 16.0f / 32768.0f;
 };
 
 #endif

@@ -3,8 +3,8 @@
 
 IMU::IMU()
 {
-    pinMode(M_CS_PIN, OUTPUT);
-    digitalWrite(M_CS_PIN, HIGH);
+    pinMode(cs_pin_, OUTPUT);
+    digitalWrite(cs_pin_, HIGH);
 
     _spi.pin_miso = digitalPinToPinName(MISO); // Configure spi pins 
     _spi.pin_mosi = digitalPinToPinName(MOSI);
@@ -34,33 +34,30 @@ void IMU::read_accel_gyro_rps(float &_accel_x, float &_accel_y, float &_accel_z,
 
     read_accel_gyro(accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z);
 
-
-    _accel_x    = (float)accel_x * m_accelRes;
-    _accel_y    = (float)accel_y * m_accelRes;
-    _accel_z    = (float)accel_z * m_accelRes;
-    _gyro_rps_x = (float)gyro_x * m_gyroRes; // Convert from degrees to radians and
-    _gyro_rps_y = (float)gyro_y * m_gyroRes; // scale dps simplified to one constant
-    _gyro_rps_z = (float)gyro_z * m_gyroRes;
+    _accel_x    = (float)accel_x * accel_res_;
+    _accel_y    = (float)accel_y * accel_res_;
+    _accel_z    = (float)accel_z * accel_res_;
+    _gyro_rps_x = (float)gyro_x * gyro_res_; // Convert from degrees to radians and
+    _gyro_rps_y = (float)gyro_y * gyro_res_; // scale dps simplified to one constant
+    _gyro_rps_z = (float)gyro_z * gyro_res_;
 }
 
 void IMU::read_register(const uint16_t _address, const uint8_t _number_bytes, uint8_t *_data)
 {
     select_bank(_address >> 7);
-
-    digitalWrite(M_CS_PIN, LOW);
+    digitalWrite(cs_pin_, LOW);
     transfer(_address | ~IMU_REG_BANK_SEL);
     transfer(_data, _number_bytes);
-    digitalWrite(M_CS_PIN, HIGH);
+    digitalWrite(cs_pin_, HIGH);
 }
 
 void IMU::write_register(const uint16_t _address, const uint8_t _data)
 {
     select_bank(_address >> 7);
-
-    digitalWrite(M_CS_PIN, LOW);
+    digitalWrite(cs_pin_, LOW);
     transfer(_address & IMU_REG_BANK_SEL); // 127 (0x7F) all but the select REG. Address x7F
     transfer(_data);
-    digitalWrite(M_CS_PIN, HIGH);
+    digitalWrite(cs_pin_, HIGH);
 }
 
 void IMU::transfer(uint8_t _data)
@@ -79,22 +76,21 @@ void IMU::select_bank(const uint8_t _bank)
 
     if (_bank != previous_bank)
     {
-        digitalWrite(M_CS_PIN, LOW);
+        digitalWrite(cs_pin_, LOW);
         transfer(IMU_REG_BANK_SEL);
         transfer(_bank << 4); // First 4 bits are reserved [5:4]
-        digitalWrite(M_CS_PIN, HIGH);
+        digitalWrite(cs_pin_, HIGH);
 
         previous_bank = _bank;
     }
 }
 
-void IMU::calibrate(const float _time) // Might rewite this
+void IMU::calibrate(const float _time_s) // Might rewite this
 {
-    constexpr float accel_offset_scale = 0.5f;           // 16g / 32g = 0.5
-    constexpr uint8_t accel_offset_scale_reciprocal = 2; // Faster to multiply than to divide
-
-    constexpr uint8_t accel_tolerance = 8;
-    constexpr uint8_t gyro_tolerance = 1;
+    static constexpr float accel_offset_scale = 0.5f;           // 16g / 32g = 0.5
+    static constexpr uint8_t accel_offset_scale_reciprocal = 2; // Faster to multiply than to divide
+    static constexpr uint8_t accel_tolerance = 8;
+    static constexpr uint8_t gyro_tolerance = 1;
 
     bool accel_calibrated = false;
     bool gyro_calibrated = false;
@@ -106,13 +102,13 @@ void IMU::calibrate(const float _time) // Might rewite this
     get_accel_offsets(offset_ax, offset_ay, offset_az);
     get_gyro_offsets(offset_gx, offset_gy, offset_gz);
 
-    offset_ax *= accel_offset_scale_reciprocal; // Scale to 8g
+    offset_ax *= accel_offset_scale_reciprocal; // Scale to 16g
     offset_ay *= accel_offset_scale_reciprocal; // Gyro doesnt need scaling as it is configured for 1000dps
     offset_az *= accel_offset_scale_reciprocal;
 
     while (!gyro_calibrated || !accel_calibrated)
     {
-        mean_accel_gyro(_time, mean_ax, mean_ay, mean_az, mean_gx, mean_gy, mean_gz);
+        mean_accel_gyro(_time_s, mean_ax, mean_ay, mean_az, mean_gx, mean_gy, mean_gz);
 
         if (!accel_calibrated)
         {

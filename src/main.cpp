@@ -35,20 +35,19 @@ void loop()
 
 	velocity_to_angles(dt_s, beta, ax, ay, az, gx_rps, gy_rps, gz_rps, roll_angle, pitch_angle, yaw_angle);
 
-    static uint32_t timer_500ms = millis();
-    if (millis() - timer_500ms > 500) 
+    static uint32_t timer_50ms = millis();
+    if (millis() - timer_50ms > 50) 
     {
-        timer_500ms = millis();
-
-        // if (gyro_iterations > 21)
-        // {
-        //     Serial.print("Roll :  ");
-        //     Serial.print(roll_angle, 5);  
-        //     Serial.print("  Pitch :  ");
-        //     Serial.print(pitch_angle, 5);  
-        //     Serial.print("  Yaw :  ");
-        //     Serial.println(yaw_angle - initial_heading, 5);
-        // }
+        timer_50ms = millis();
+        if (gyro_iterations > 21)
+        {
+            Serial.print("Roll :  ");
+            Serial.print(roll_angle, 5);  
+            Serial.print("  Pitch :  ");
+            Serial.print(pitch_angle, 5);  
+            Serial.print("  Yaw :  ");
+            Serial.println(yaw_angle - initial_heading, 5);
+        }
         if (gyro_iterations <= 20) // Wonky but legit logic
         {
             if (gyro_iterations == 20)
