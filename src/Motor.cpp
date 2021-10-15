@@ -19,6 +19,7 @@ void Motor::drive(int16_t _speed)
 }
 
 void Motor::brake()
+
 {
    digitalWrite(input_1_pin_, HIGH);
    digitalWrite(input_2_pin_, HIGH);

@@ -23,7 +23,7 @@ public:
      * 
      * @return The power for related motor
     **/
-    double calculate(int32_t _sensorVal);
+    int16_t calculate(int32_t _sensorVal);
     
     /**
      * Has the PID control finished?
@@ -68,23 +68,18 @@ private:
     const float kI_;
     const float kD_;
 
-    const uint8_t min_output_;
-    const uint8_t max_output_;
-    const uint8_t max_completion_error_;
-    const uint8_t min_derivative_;
-    const uint16_t integral_limit_;
-    const uint16_t max_time_;
-    const float derivative_gain_;
+    static constexpr uint8_t min_output_ = 255;
+    static constexpr uint8_t max_output_ = 255;
+    static constexpr uint8_t max_completion_error_ = 5;
+    static constexpr uint8_t min_derivative_ = 0;
+    static constexpr uint16_t max_time_ = 255;
+    static constexpr uint32_t integral_limit_ = 1000000;
+    static constexpr float derivative_gain_ = 0.8;
 
     int32_t error_; // Should theoretically be int64_t but.... (in the case of INT32_MAX - (-INT32_MAX))
-    int32_t past_error_;
-    int32_t integral_;
-    uint32_t last_time_;
+    int32_t  integral_;
+    int32_t  derivative_;
     uint32_t start_time_;
-
-    double derivative_;
-    double last_sensor_value_;
-    double last_derivative_;
 };
 
 #endif

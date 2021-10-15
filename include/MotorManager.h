@@ -2,9 +2,10 @@
 #define MOTOR_MANAGER_H
 
 #include <Arduino.h>
+
+#include "Encoder.h"
 #include "Motor.h"
 #include "PID.h"
-#include "Encoder.h"
 
 class MotorManager
 {
@@ -19,7 +20,7 @@ public:
         Encoder* encoder_;
         Motor* motor_;
         PID* pid_;
-    } left_drive_, right_drive_;
+    } leftDrive_, rightDrive_;
 
 private:
     bool active_;

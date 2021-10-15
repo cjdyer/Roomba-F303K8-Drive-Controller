@@ -3,17 +3,17 @@
 
 MotorManager::MotorManager()
 {
-    void (*left_callback)() = encoderCallback(left_drive_.encoder_);
-    void (*right_callback)() = encoderCallback(right_drive_.encoder_);
+    void (*left_callback)() = encoderCallback(leftDrive_.encoder_);
+    void (*right_callback)() = encoderCallback(rightDrive_.encoder_);
 
-    left_drive_.encoder_ = new Encoder(encoderLA, encoderLB);
-    right_drive_.encoder_ = new Encoder(encoderRB, encoderRA);
+    leftDrive_.encoder_ = new Encoder(encoderLA, encoderLB);
+    rightDrive_.encoder_ = new Encoder(encoderRB, encoderRA);
 
-    left_drive_.motor_ = new Motor(BIN1, BIN2, PWMB, STBY);
-    right_drive_.motor_ = new Motor(AIN1, AIN2, PWMA, STBY);
+    leftDrive_.motor_ = new Motor(BIN1, BIN2, PWMB, STBY);
+    rightDrive_.motor_ = new Motor(AIN1, AIN2, PWMA, STBY);
 
-    left_drive_.pid_ = new PID(2, 0.0005, 0);
-    right_drive_.pid_ = new PID(2, 0.0005, 0);
+    leftDrive_.pid_ = new PID(2, 0.0005, 0);
+    rightDrive_.pid_ = new PID(2, 0.0005, 0);
 
     attachInterrupt(encoderLA, left_callback, CHANGE);
     attachInterrupt(encoderLB, left_callback, CHANGE);
@@ -23,26 +23,31 @@ MotorManager::MotorManager()
 
 void MotorManager::driveTo(int16_t _x, int16_t _y)
 {
-
     // pid_->reset();
-    // pid_->setTarget(_target);
+    // pid_->setTarget(target);
     // active_ = true;
 }
 
 void MotorManager::run()
 {
-    // if (active_)
-    // {
-    //     int32_t encoder_value = encoder_->getPosition();
-    //     double pid_value = pid_->calculate(encoder_value);
-    //     motor_->drive(pid_value);
+    if (active_)
+    {
+        int32_t left_encoder_value = leftDrive_.encoder_->getPosition();
+        int32_t right_encoder_value = rightDrive_.encoder_->getPosition();
 
-    //     if(pid_->done())
-    //     {
-    //         active_ = false;
-    //         motor_->drive(0);
-    //     }
-    // }
+        int16_t left_pid_value = leftDrive_.pid_->calculate(left_encoder_value);
+        int16_t right_pid_value = rightDrive_.pid_->calculate(right_encoder_value);
+
+        leftDrive_.motor_->drive(left_pid_value);
+        rightDrive_.motor_->drive(right_pid_value);
+
+        if(leftDrive_.pid_->done() && rightDrive_.pid_->done())
+        {
+            leftDrive_.motor_->drive(0);
+            rightDrive_.motor_->drive(0);
+            active_ = false;
+        }
+    }
 }
 
 void (*encoderCallback(Encoder *_encoder))() { _encoder->encoderTick(); }
