@@ -1,26 +1,50 @@
 #include "Imu.h"
-#include "madgwick_filter.h"
+#include "madgwick_filter.h" 
+#include "MotorManager.h"
 
 uint32_t t, dt, t0;
 float dt_s;
 
 float ax, ay, az, gx_rps, gy_rps, gz_rps;
-float roll_angle, pitch_angle, yaw_angle, roll_angle_accel, pitch_angle_accel, initial_heading;
+float yaw_angle, initial_heading;
+float position_x, position_y;
 
 uint8_t gyro_iterations = 0;
 
 IMU imu;
-// Beta initial value - 2.5 to ensure convergence of algorithm states
-// Set Beta to a lower value after 10 seconds  
-// 0.033 ideal dynamic performance | 0.01 Ideal static performance
-float beta = 2.5;
+MotorManager motorManager;
 
 void setup()
 {
     Serial.begin(115200);
     while (!Serial);
+    Serial.println("here");
 
     imu.begin();  
+
+    uint32_t timer_1s = millis();
+
+    while(true) // calibrate madgwick
+    {
+        t  = micros();
+        dt = (t - t0);  // in us
+        dt_s = (float) (dt) * 1.e-6;	// in s
+        t0 = t;
+
+        imu.read_accel_gyro_rps(ax, ay, az, gx_rps, gy_rps, gz_rps);
+        // Beta initial value - 2.5 to ensure convergence of algorithm states
+        // Set Beta to a lower value after 10 seconds  
+        // 0.033 ideal dynamic performance | 0.01 Ideal static performance
+        velocity_to_angles(dt_s, 2.5, ax, ay, az, gx_rps, gy_rps, gz_rps, yaw_angle); // Only Yaw is currently calculated
+
+        if (millis() - timer_1s > 1000) { break; } // calibrate for 1s
+    }
+
+    initial_heading = yaw_angle;
+    motorManager.driveTo(100, 0);
+    Serial.println("Init Complete");
+
+    motorManager.attachInterrupts();
 }
 
 void loop()
@@ -30,36 +54,21 @@ void loop()
     dt_s = (float) (dt) * 1.e-6;	// in s
     t0 = t;
 
-	// read accel and gyro measurements
+	// Read accel and gyro measurements
 	imu.read_accel_gyro_rps(ax, ay, az, gx_rps, gy_rps, gz_rps);
-
-	velocity_to_angles(dt_s, beta, ax, ay, az, gx_rps, gy_rps, gz_rps, roll_angle, pitch_angle, yaw_angle);
+    // Calculate heading 
+	velocity_to_angles(dt_s, 0.033, ax, ay, az, gx_rps, gy_rps, gz_rps, yaw_angle);
+    // Run motors/PIDs
+    // motorManager.run(dt_s, yaw_angle);
+    // motorManager.getPosition(position_x, position_y);
 
     static uint32_t timer_50ms = millis();
     if (millis() - timer_50ms > 50) 
     {
         timer_50ms = millis();
-        if (gyro_iterations > 21)
-        {
-            Serial.print("Roll :  ");
-            Serial.print(roll_angle, 5);  
-            Serial.print("  Pitch :  ");
-            Serial.print(pitch_angle, 5);  
-            Serial.print("  Yaw :  ");
-            Serial.println(yaw_angle - initial_heading, 5);
-        }
-        if (gyro_iterations <= 20) // Wonky but legit logic
-        {
-            if (gyro_iterations == 20)
-            {
-                beta = 0.033; 
-                initial_heading = yaw_angle; // After Madgwick filter is in steady-state set heading.
-                gyro_iterations++;
-            }
-            else 
-            {
-                gyro_iterations++;
-            }
-        }
+        Serial.print("X :  ");
+        Serial.print(position_x, 2);  
+        Serial.print("  Y :  ");
+        Serial.println(position_y, 2);
     }
 }

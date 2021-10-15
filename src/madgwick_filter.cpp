@@ -6,7 +6,7 @@
 const float RAD2DEG = (float) 4068 / 71;
 
 // get pose in euler angles and quaternion form
-void velocity_to_angles(const float dt_s, const float _beta, float ax, float ay, float az, const float gx, const float gy, const float gz, float &angle_x, float &angle_y, float &angle_z) {
+void velocity_to_angles(const float dt_s, const float _beta, float ax, float ay, float az, const float gx, const float gy, const float gz, float &angle_z) {
     static float recipNorm;
 	static float s0, s1, s2, s3;
 	static float qDot1, qDot2, qDot3, qDot4;
@@ -62,7 +62,7 @@ void velocity_to_angles(const float dt_s, const float _beta, float ax, float ay,
 	// Integrate rate of change of quaternion to yield quaternion
 	q0 += qDot1 * dt_s;
 	q1 += qDot2 * dt_s;
-	q2 += qDot3 * dt_s;
+	q2 += qDot3 * dt_s; 
 	q3 += qDot4 * dt_s;
 
 	// normalize quaternion
@@ -72,9 +72,9 @@ void velocity_to_angles(const float dt_s, const float _beta, float ax, float ay,
 	q2 *= recipNorm;
 	q3 *= recipNorm;
 
-    angle_x = atan2f(q0*q1 + q2*q3, 0.5f - q1*q1 - q2*q2) * RAD2DEG;
-	angle_y = asinf(-2.0f * (q1*q3 - q0*q2)) * RAD2DEG;
-	angle_z = atan2f(q1*q2 + q0*q3, 0.5f - q2*q2 - q3*q3) * RAD2DEG;
+    //angle_x = atan2f(q0*q1 + q2*q3, 0.5f - q1*q1 - q2*q2) * RAD2DEG;
+	//angle_y = asinf(-2.0f * (q1*q3 - q0*q2)) * RAD2DEG;
+	angle_z = atan2f(q1*q2 + q0*q3, 0.5f - q2*q2 - q3*q3); // * RAD2DEG;
 }
 
 // Fast inverse square-root

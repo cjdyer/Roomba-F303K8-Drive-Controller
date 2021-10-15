@@ -16,4 +16,7 @@
 #define encoderRA A2 //3
 #define encoderRB A3 //2
 
+/* Define SPI pins */
+#define SPI_CS 10
+
 #endif

@@ -3,9 +3,6 @@
 
 IMU::IMU()
 {
-    pinMode(cs_pin_, OUTPUT);
-    digitalWrite(cs_pin_, HIGH);
-
     _spi.pin_miso = digitalPinToPinName(MISO); // Configure spi pins 
     _spi.pin_mosi = digitalPinToPinName(MOSI);
     _spi.pin_sclk = digitalPinToPinName(SCK);
@@ -14,6 +11,9 @@ IMU::IMU()
 
 void IMU::begin()
 {
+    pinMode(cs_pin_, OUTPUT);
+    digitalWrite(cs_pin_, HIGH);
+
     spi_init(&_spi, 7e6, SPI_MODE_3, MSBFIRST); // Begin SPI
 
     write_register(IMU_REG_PWR_MGMT_1, IMU_BIT_CLK_PLL | IMU_BIT_TEMP_DIS); // Enable clock, disable sleep and disable temp sensor
@@ -22,9 +22,11 @@ void IMU::begin()
     write_register(IMU_REG_ACCEL_CONFIG, IMU_ACCEL_FULLSCALE_16G | IMU_ACCEL_ENABLE_DLPF | IMU_ACCEL_BW_6HZ);       // Configure Accel
     write_register(IMU_REG_GYRO_CONFIG_1, IMU_GYRO_FULLSCALE_1000DPS | IMU_BIT_GYRO_FCHOICE | IMU_GYRO_BW_12100HZ); // Configure Gyro                                                              // Accelerometer start time
 
+    Serial.println("Calibration Begin");
     // high time = more risk of over calibration
     // low time = more risk of random correlation and worse drift
     calibrate(0.5); // Open to change in this time
+    Serial.println("Calibration End");
 }
 
 void IMU::read_accel_gyro_rps(float &_accel_x, float &_accel_y, float &_accel_z, float &_gyro_rps_x, float &_gyro_rps_y, float &_gyro_rps_z)
@@ -87,10 +89,10 @@ void IMU::select_bank(const uint8_t _bank)
 
 void IMU::calibrate(const float _time_s) // Might rewite this
 {
-    static constexpr float accel_offset_scale = 0.5f;           // 16g / 32g = 0.5
-    static constexpr uint8_t accel_offset_scale_reciprocal = 2; // Faster to multiply than to divide
-    static constexpr uint8_t accel_tolerance = 8;
-    static constexpr uint8_t gyro_tolerance = 1;
+    constexpr float accel_offset_scale = 0.5f;           // 16g / 32g = 0.5
+    constexpr uint8_t accel_offset_scale_reciprocal = 2; // Faster to multiply than to divide
+    constexpr uint8_t accel_tolerance = 8;
+    constexpr uint8_t gyro_tolerance = 1;
 
     bool accel_calibrated = false;
     bool gyro_calibrated = false;

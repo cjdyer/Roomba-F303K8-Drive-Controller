@@ -1,11 +1,10 @@
 #include "MotorManager.h"
 #include "pins.h"
 
+void (*encoderCallback(Encoder *_encoder))() { _encoder->encoderTick(); }
+
 MotorManager::MotorManager()
 {
-    void (*left_callback)() = encoderCallback(leftDrive_.encoder_);
-    void (*right_callback)() = encoderCallback(rightDrive_.encoder_);
-
     leftDrive_.encoder_ = new Encoder(encoderLA, encoderLB);
     rightDrive_.encoder_ = new Encoder(encoderRB, encoderRA);
 
@@ -14,6 +13,12 @@ MotorManager::MotorManager()
 
     leftDrive_.pid_ = new PID(2, 0.0005, 0);
     rightDrive_.pid_ = new PID(2, 0.0005, 0);
+}
+
+void MotorManager::attachInterrupts()
+{
+    void (*left_callback)() = encoderCallback(leftDrive_.encoder_);
+    void (*right_callback)() = encoderCallback(rightDrive_.encoder_);
 
     attachInterrupt(encoderLA, left_callback, CHANGE);
     attachInterrupt(encoderLB, left_callback, CHANGE);
@@ -23,17 +28,23 @@ MotorManager::MotorManager()
 
 void MotorManager::driveTo(int16_t _x, int16_t _y)
 {
-    // pid_->reset();
-    // pid_->setTarget(target);
-    // active_ = true;
+    leftDrive_.pid_->reset();
+    rightDrive_.pid_->reset();
+    leftDrive_.pid_->setTarget(_x);
+    rightDrive_.pid_->setTarget(_x);
+    active_ = true;
 }
 
-void MotorManager::run()
+void MotorManager::run(const uint32_t _dt, const float _gyroscope)
 {
     if (active_)
     {
         int32_t left_encoder_value = leftDrive_.encoder_->getPosition();
         int32_t right_encoder_value = rightDrive_.encoder_->getPosition();
+
+        calculatePosition(left_encoder_value, right_encoder_value, _gyroscope, _dt);
+
+        // Code goes here.....
 
         int16_t left_pid_value = leftDrive_.pid_->calculate(left_encoder_value);
         int16_t right_pid_value = rightDrive_.pid_->calculate(right_encoder_value);
@@ -50,4 +61,27 @@ void MotorManager::run()
     }
 }
 
-void (*encoderCallback(Encoder *_encoder))() { _encoder->encoderTick(); }
+void MotorManager::getPosition(float &_x, float &_y)
+{
+    _x = global_x_;
+    _y = global_y_;
+}
+
+void MotorManager::calculatePosition(const int32_t _left_encoder,const int32_t _right_encoder, const float _gyroscope, const uint32_t _dt)
+{
+    static int32_t previous_left_encoder = 0, previous_right_encoder = 0;
+
+    int32_t change_x = _left_encoder - previous_left_encoder;
+    int32_t change_y = _right_encoder - previous_right_encoder;
+
+    previous_left_encoder = _left_encoder;
+    previous_right_encoder = _right_encoder;
+
+    float linear_velocity = (change_x + change_y) / 2;
+
+    float linear_velocity_x = linear_velocity * sin(_gyroscope);
+    float linear_velocity_y = linear_velocity * cos(_gyroscope);
+
+    global_x_ += linear_velocity_x * _dt;
+    global_y_ += linear_velocity_y * _dt;
+}
