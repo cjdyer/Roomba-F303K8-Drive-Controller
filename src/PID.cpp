@@ -23,9 +23,9 @@ int16_t PID::calculate(int32_t _sensor_value)
 
     //Calculate integral_ (If conditions are met).
     integral_ = (abs(integral_) >= integral_limit_) * (integral_limit_ * sgn(integral_)) + (abs(integral_) < integral_limit_) * integral_;
-    integral_ = !((sgn(integral_) != sgn(error_) || abs(error_) > 500)) * integral_;
+    integral_ = !(sgn(integral_) != sgn(error_) || abs(error_) > 50) * integral_;
 
-    derivative_ = ((_sensor_value - last_sensor_value) / time_difference) * derivative_gain_ + last_derivative * (1 - derivative_gain_); // Derivative filtering
+    derivative_ = (abs(_sensor_value - last_sensor_value) / time_difference) * derivative_gain_ + last_derivative * (1 - derivative_gain_); // Derivative filtering
 
     last_derivative = derivative_;
     last_sensor_value = _sensor_value;

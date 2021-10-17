@@ -73,12 +73,12 @@ private:
     static constexpr uint8_t max_completion_error_ = 5;
     static constexpr uint8_t min_derivative_ = 0;
     static constexpr uint16_t max_time_ = 255;
-    static constexpr uint32_t integral_limit_ = 1000000;
+    static constexpr uint32_t integral_limit_ = 100000;
     static constexpr float derivative_gain_ = 0.8;
 
     int32_t error_; // Should theoretically be int64_t but.... (in the case of INT32_MAX - (-INT32_MAX))
-    int32_t  integral_;
-    int32_t  derivative_;
+    int32_t integral_;
+    int32_t derivative_;
     uint32_t start_time_;
 };
 

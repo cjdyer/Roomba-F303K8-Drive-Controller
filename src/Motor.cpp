@@ -7,19 +7,18 @@ input_1_pin_(_input_1_pin), input_2_pin_(_input_2_pin), pwm_pin_(_pwm_pin), enab
     pinMode(input_2_pin_, OUTPUT);
     pinMode(pwm_pin_, OUTPUT);
     pinMode(enable_pin_, OUTPUT);
+    digitalWrite(enable_pin_, HIGH);
 }
 
-void Motor::drive(int16_t _speed)
+void Motor::drive(const int16_t _speed)
 {
-    digitalWrite(enable_pin_, HIGH);
     bool direction = (_speed > 0);
     digitalWrite(input_1_pin_, direction * HIGH);
-    digitalWrite(input_2_pin_, !direction * HIGH);  
-    analogWrite(pwm_pin_, (direction * _speed) + (!direction * - _speed));
+    digitalWrite(input_2_pin_, !direction * HIGH);
+    analogWrite(pwm_pin_, (_speed * direction) - (_speed * !direction));
 }
 
 void Motor::brake()
-
 {
    digitalWrite(input_1_pin_, HIGH);
    digitalWrite(input_2_pin_, HIGH);

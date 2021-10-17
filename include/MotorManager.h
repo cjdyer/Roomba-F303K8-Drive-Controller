@@ -10,13 +10,15 @@
 class MotorManager
 {
 public:
-    MotorManager();
+    MotorManager(Encoder* _left_encoder, Encoder* _right_encoder);
 
-    void driveTo(const int16_t _x, const int16_t _y);
-    void run(const uint32_t _dt, const float _gyroscope);
+    void driveTo(const int16_t _distance);
+    void rotateTo(const int16_t _angle);
+    void run();
     void setActive(const bool _active_state);
-    void getPosition(float &_x, float &_y);
-    void attachInterrupts();
+    
+    void leftEncoderCallback();
+    void rightEncoderCallback();
 
 private:
     struct Drive {
@@ -25,11 +27,7 @@ private:
         PID* pid_;
     } leftDrive_, rightDrive_;
 
-    void calculatePosition(const int32_t _left_encoder,const int32_t _right_encoder, const float _gyroscope, const uint32_t _dt);
-
 private:
-    int32_t target_x_, target_y_;
-    float global_x_, global_y_;
     bool active_;
 };
 
