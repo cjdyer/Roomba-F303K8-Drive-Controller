@@ -6,19 +6,17 @@
 #include "Encoder.h"
 #include "Motor.h"
 #include "PID.h"
+#include "pins.h"
 
 class MotorManager
 {
 public:
-    MotorManager(Encoder* _left_encoder, Encoder* _right_encoder);
+    MotorManager();
 
     void driveTo(const int16_t _distance);
     void rotateTo(const int16_t _angle);
     void run();
     void setActive(const bool _active_state);
-    
-    void leftEncoderCallback();
-    void rightEncoderCallback();
 
 private:
     struct Drive {
@@ -30,7 +28,5 @@ private:
 private:
     bool active_;
 };
-
-void (*encoderCallback(Encoder *_encoder))(void);
 
 #endif

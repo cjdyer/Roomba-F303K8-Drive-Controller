@@ -11,8 +11,8 @@
 #define STBY 9
 
 /* Define encoder pins */
-#define ENCODER_LA A2 
-#define ENCODER_LB A3 
+#define ENCODER_LA A3 
+#define ENCODER_LB A2
 #define ENCODER_RA A0 
 #define ENCODER_RB A1 
 

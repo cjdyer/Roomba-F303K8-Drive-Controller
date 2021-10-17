@@ -7,13 +7,9 @@ class PID
 {    
 public:
     /**
-     * Initialize new PID object with PID constants
-     *
-     * @param _kP Proportional multiplier
-     * @param _kI Integral multiplier
-     * @param _kD Derivative multipler
+     * Initialize new PID object
     **/
-    PID (const float _kP, const float _kI, const float _kD);
+    PID ();
     
 
     /**
@@ -54,19 +50,21 @@ public:
     void reset();
 
     /**
-     * Getter function for the PID's target
+     * Sets the current constant values
      * 
-     * @return the PID target
+     * @param _kp Proportional constant
+     * @param _ki Integral constant
+     * @param _kd Differential constant
     **/
-    int getTarget();
+    void setConstants(const float _kp, const float _ki, const float _kd);
     
 protected:
     int32_t target;
         
 private:
-    const float kP_;
-    const float kI_;
-    const float kD_;
+    float kP_;
+    float kI_;
+    float kD_;
 
     static constexpr uint8_t min_output_ = 255;
     static constexpr uint8_t max_output_ = 255;
