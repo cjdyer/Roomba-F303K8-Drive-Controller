@@ -55,6 +55,9 @@ void MotorManager::run()
         int16_t left_pid_value = leftDrive_.pid_->calculate(left_encoder_value);
         int16_t right_pid_value = rightDrive_.pid_->calculate(right_encoder_value);
 
+        Serial.println(left_pid_value);
+        Serial.println(right_pid_value);
+
         leftDrive_.motor_->drive(left_pid_value);
         rightDrive_.motor_->drive(right_pid_value);
 

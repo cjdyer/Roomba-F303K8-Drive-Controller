@@ -1,9 +1,6 @@
-#include "pins.h"
 #include "MotorManager.h"
-#include "SerialManager.h"
 
 MotorManager motorManager;
-SerialManager serialManager;
 
 void setup()
 {
@@ -15,6 +12,6 @@ void setup()
 void loop()
 {
     // Run motors/PIDs
-    
     motorManager.run();
+    delay(5);
 }

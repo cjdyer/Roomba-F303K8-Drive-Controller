@@ -72,10 +72,3 @@ void PID::reset()
     derivative_ = 0;
     start_time_ = 0;
 }
-
-void PID::setConstants(const float _kp, const float _ki, const float _kd)
-{
-    kP_ = _kp;
-    kI_ = _ki;
-    kD_ = _kd;
-}

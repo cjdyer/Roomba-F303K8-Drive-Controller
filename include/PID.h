@@ -13,7 +13,6 @@ public:
      * @param _kI Integral multiplier
      * @param _kD Derivative multipler
     **/
-    **/
     PID(const float _kP, const float _kI, const float _kD);
     
 

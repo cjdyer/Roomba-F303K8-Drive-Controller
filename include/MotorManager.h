@@ -1,7 +1,7 @@
 #ifndef MOTOR_MANAGER_H
 #define MOTOR_MANAGER_H
 
-#include <Arduino.h>
+#include "Arduino.h"
 
 #include "Encoder.h"
 #include "Motor.h"
@@ -16,7 +16,6 @@ public:
     void driveTo(const int16_t _distance);
     void rotateTo(const int16_t _angle);
     void run();
-    void setActive(const bool _active_state);
 
 private:
     struct Drive {
