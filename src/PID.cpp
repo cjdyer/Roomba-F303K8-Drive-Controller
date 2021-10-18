@@ -5,7 +5,7 @@ int8_t sgn(int32_t _n)
     return (_n > 0) * 1 + (_n < 0) * -1;
 }
 
-PID::PID() {}
+PID::PID(const float _kP, const float _kI, const float _kD) : kP_(_kP), kI_(_kI), kD_(_kD) {}
 
 int16_t PID::calculate(int32_t _sensor_value)
 {

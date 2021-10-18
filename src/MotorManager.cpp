@@ -15,8 +15,8 @@ MotorManager::MotorManager()
     leftDrive_.motor_ = new Motor(AIN2, AIN1, PWMA, STBY);
     rightDrive_.motor_ = new Motor(BIN2, BIN1, PWMB, STBY);
 
-    leftDrive_.pid_ = new PID();
-    rightDrive_.pid_ = new PID();
+    leftDrive_.pid_ = new PID(2, 0.00025, 0.12);
+    rightDrive_.pid_ = new PID(2, 0.00025, 0.12);
 
     attachInterrupt(ENCODER_LA, leftEncoderCallback, CHANGE);
     attachInterrupt(ENCODER_LB, leftEncoderCallback, CHANGE);
@@ -28,11 +28,9 @@ void MotorManager::driveTo(const int16_t _distance)
 {
     leftDrive_.pid_->reset();
     leftDrive_.pid_->setTarget(_distance);
-    leftDrive_.pid_->setConstants(2, 0.00025, 0.12);
     
     rightDrive_.pid_->reset();
     rightDrive_.pid_->setTarget(_distance);
-    rightDrive_.pid_->setConstants(2, 0.00025, 0.12);
     
     active_ = true;
 }
@@ -41,11 +39,9 @@ void MotorManager::rotateTo(const int16_t _angle)
 {
     leftDrive_.pid_->reset();
     leftDrive_.pid_->setTarget(_angle);
-    leftDrive_.pid_->setConstants(2, 0.00025, 0.12);
 
     rightDrive_.pid_->reset();
     rightDrive_.pid_->setTarget(-_angle);
-    rightDrive_.pid_->setConstants(2, 0.00025, 0.12);
     active_ = true;
 }
 
