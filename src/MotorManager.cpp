@@ -50,10 +50,12 @@ void MotorManager::run()
     static char command_byte;
     static int16_t data;
 
+    // A better method is to actively always look for command bits and then record data after
+    // the command has been selected.
     if (Serial.available() > 2) // Data available for read
-    {
+    {  
         command_byte = Serial.read(); // Read byte
-        data = Serial.read() + Serial.read() << 8;
+        data = Serial.read() + (Serial.read() << 8);
 
         switch (command_byte)
         {
@@ -62,12 +64,12 @@ void MotorManager::run()
             break;
         case 'd':
             driveTo(data);
-            Serial.print("Moving to - ");
+            Serial.print("Moving to : ");
             Serial.println(data);
             break;
         case 'r':
             rotateTo(data);
-            Serial.print("Rotating to - ");
+            Serial.print("Rotating to : ");
             Serial.println(data);
             break;
         default:
