@@ -42,12 +42,13 @@ void MotorManager::rotateTo(const int16_t _angle)
 
     rightDrive_.pid_->reset();
     rightDrive_.pid_->setTarget(-_angle);
+    
     active_ = true;
 }
 
 void MotorManager::run()
 {
-    static char command_byte;
+    static int command_byte;
     static int16_t data;
 
     // A better method is to actively always look for command bits and then record data after

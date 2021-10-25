@@ -14,9 +14,9 @@ public:
     MotorManager();
     void run();
 
-private:
     void rotateTo(const int16_t _angle);
     void driveTo(const int16_t _distance);
+private:
 
 
 private:
